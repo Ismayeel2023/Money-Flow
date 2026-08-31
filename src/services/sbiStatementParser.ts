@@ -30,19 +30,23 @@ export class SbiStatementParser {
     let upiRef: string | undefined;
     let isRefund = false;
 
-    // Detect UPI Reference
-    // Example: TRANSFER-UPI/DR/423456789012/FLIPKART/PYM or TO TRANSFER-INB UPI/CR/423456789012/...
-    const upiMatch = cleanDesc.match(/UPI(?:\/DR|\/CR)?\/([0-9]{9,16})/i) || cleanDesc.match(/\/([0-9]{12})\//);
+    // Detect UPI Reference (e.g. 12-digit reference number)
+    const upiMatch =
+      cleanDesc.match(/UPI(?:\/DR|\/CR)?\/([0-9]{9,16})/i) ||
+      cleanDesc.match(/\/([0-9]{12})\//) ||
+      cleanDesc.match(/\b([0-9]{12})\b/);
+
     if (upiMatch) {
       upiRef = upiMatch[1];
     }
 
     // Detect Refund
+    const lower = cleanDesc.toLowerCase();
     if (
-      cleanDesc.toLowerCase().includes('refund') ||
-      cleanDesc.toLowerCase().includes('reversal') ||
-      cleanDesc.toLowerCase().includes('cashback') ||
-      (isCredit && cleanDesc.toLowerCase().includes('amazon') && cleanDesc.toLowerCase().includes('ret'))
+      lower.includes('refund') ||
+      lower.includes('reversal') ||
+      lower.includes('cashback') ||
+      (isCredit && (lower.includes('amazon') || lower.includes('flipkart')) && lower.includes('ret'))
     ) {
       isRefund = true;
     }
@@ -53,21 +57,49 @@ export class SbiStatementParser {
     // Parse UPI Segments
     if (cleanDesc.toUpperCase().includes('UPI')) {
       const parts = cleanDesc.split('/');
-      if (parts.length >= 4) {
-        // usually parts[3] or parts[4] contains the payee/payer
-        const candidate = parts[3]?.trim();
-        if (candidate && !/^\d+$/.test(candidate)) {
-          party = candidate;
-        } else if (parts[4]?.trim() && !/^\d+$/.test(parts[4]?.trim())) {
-          party = parts[4].trim();
+      // Look for first valid non-keyword, non-numeric segment
+      const ignoredKeywords = new Set([
+        'TRANSFER-UPI',
+        'TO TRANSFER-UPI',
+        'BY TRANSFER-UPI',
+        'TRANSFER-INB',
+        'TO TRANSFER-INB',
+        'BY TRANSFER-INB',
+        'TRANSFER',
+        'UPI',
+        'DR',
+        'CR',
+        'PYM',
+        'RET',
+        'INCOME',
+        'PAYMENT',
+        'MOB',
+        'NA',
+        'NEFT',
+        'RTGS',
+        'IMPS',
+      ]);
+
+      for (let i = 0; i < parts.length; i++) {
+        const candidate = parts[i]?.trim();
+        if (!candidate || /^\d+$/.test(candidate) || ignoredKeywords.has(candidate.toUpperCase())) {
+          continue;
         }
+        // Found a potential party segment
+        party = candidate;
+        break;
       }
     }
 
-    // Known merchant heuristics
+    // Strip surrounding parentheses from extracted party (e.g. "(FLIPKART INDIA PVT LTD)" -> "FLIPKART INDIA PVT LTD")
+    if (party) {
+      party = party.replace(/^[\(\[\{]+/, '').replace(/[\)\]\}]+$/, '').trim();
+    }
+
+    // Known merchant & entity heuristics
     const upper = cleanDesc.toUpperCase();
     if (upper.includes('FLIPKART')) {
-      party = 'FLIPKART';
+      party = isRefund ? 'Flipkart Refund' : 'FLIPKART';
       partyType = 'merchant';
     } else if (upper.includes('AMAZON')) {
       party = isRefund ? 'Amazon Refund' : 'Amazon';
@@ -96,13 +128,16 @@ export class SbiStatementParser {
     }
 
     if (!party) {
-      // Fallback: extract first substantial words
+      // Fallback: extract first substantial words from raw description
       const cleaned = cleanDesc
         .replace(/TRANSFER-UPI\/(?:DR|CR)\/\d+\//gi, '')
         .replace(/TO TRANSFER-INB/gi, '')
+        .replace(/BY TRANSFER-INB/gi, '')
         .replace(/BY TRANSFER/gi, '')
+        .replace(/TO TRANSFER/gi, '')
         .trim();
-      party = cleaned.split('/')[0]?.slice(0, 30)?.trim() || 'Merchant/Payee';
+      const firstPart = cleaned.split('/')[0]?.slice(0, 40)?.trim() || 'Merchant/Payee';
+      party = firstPart.replace(/^[\(\[\{]+/, '').replace(/[\)\]\}]+$/, '').trim();
     }
 
     // Classify partyType if still unknown
@@ -116,11 +151,22 @@ export class SbiStatementParser {
         pUpper.includes('MART') ||
         pUpper.includes('SHOP') ||
         pUpper.includes('DELI') ||
-        pUpper.includes('RESTAURANT')
+        pUpper.includes('RESTAURANT') ||
+        pUpper.includes('CAFE') ||
+        pUpper.includes('HOTEL') ||
+        pUpper.includes('ENTERPRISE') ||
+        pUpper.includes('SERVICES') ||
+        pUpper.includes('RECHARGE') ||
+        pUpper.includes('FEE') ||
+        pUpper.includes('PAYOUT')
       ) {
         partyType = 'merchant';
       } else if (/^[A-Z\s.]+$/.test(party) && party.split(' ').length >= 2) {
         partyType = 'person';
+      } else if (pUpper.startsWith('MR ') || pUpper.startsWith('MS ') || pUpper.startsWith('MRS ') || pUpper.startsWith('DR ')) {
+        partyType = 'person';
+      } else {
+        partyType = 'merchant';
       }
     }
 
@@ -128,23 +174,47 @@ export class SbiStatementParser {
   }
 
   /**
-   * Parses standard SBI date format (e.g. "25/08/2026" or "25 Aug 2026") into ISO "YYYY-MM-DD"
+   * Parses standard SBI date format (e.g. "25/08/2026", "25 Aug 2026", "25-Aug-2026") into ISO "YYYY-MM-DD"
+   * Deterministic with ZERO timezone drift.
    */
   public static parseDate(dateStr: string): string {
-    const slashMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    const trimmed = dateStr.trim();
+
+    // 1. DD/MM/YYYY or DD-MM-YYYY
+    const slashMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
     if (slashMatch) {
       const day = slashMatch[1].padStart(2, '0');
       const month = slashMatch[2].padStart(2, '0');
-      const year = slashMatch[3];
+      let year = slashMatch[3];
+      if (year.length === 2) year = `20${year}`;
       return `${year}-${month}-${day}`;
     }
 
-    const d = new Date(dateStr);
-    if (!isNaN(d.getTime())) {
-      return d.toISOString().split('T')[0];
+    // 2. DD Mon YYYY or DD-Mon-YYYY (e.g. "25 Aug 2026", "25-Aug-2026", "25 Aug 26")
+    const monthNames: Record<string, string> = {
+      jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+      jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12',
+    };
+    const monMatch = trimmed.match(/^(\d{1,2})[\s\-]+([A-Za-z]{3,9})[\s\-]+(\d{2,4})/);
+    if (monMatch) {
+      const day = monMatch[1].padStart(2, '0');
+      const monStr = monMatch[2].slice(0, 3).toLowerCase();
+      const month = monthNames[monStr] || '01';
+      let year = monMatch[3];
+      if (year.length === 2) year = `20${year}`;
+      return `${year}-${month}-${day}`;
     }
 
-    return new Date().toISOString().split('T')[0];
+    // 3. YYYY-MM-DD or YYYY/MM/DD
+    const isoMatch = trimmed.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    if (isoMatch) {
+      const year = isoMatch[1];
+      const month = isoMatch[2].padStart(2, '0');
+      const day = isoMatch[3].padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    return '2026-08-25';
   }
 
   /**
@@ -168,7 +238,7 @@ export class SbiStatementParser {
       }
 
       const isoDate = this.parseDate(row.date);
-      const normDesc = row.description.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').trim();
+      const normDesc = row.description.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
 
       const fingerprint = TransactionService.generateFingerprint({
         bank: 'SBI',

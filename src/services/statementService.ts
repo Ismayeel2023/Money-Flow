@@ -13,66 +13,167 @@ import { TransactionService } from './transactionService';
 export class StatementService {
   /**
    * Parses raw statement text / lines into structured RawSbiRow items.
+   * Accurately stitches multi-line wrapped transaction rows, parses debit/credit,
+   * and preserves rawDescription untouched.
    */
   public static parseStatementText(textLines: string[]): RawSbiRow[] {
     const rows: RawSbiRow[] = [];
 
-    // Regex for matching date at start of line: e.g. 2026-08-25, 25/08/2026, or 25 Aug 2026
-    const dateRegex = /^(\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}|\d{1,2}\s+[A-Za-z]{3}\s+\d{2,4})/;
+    // Regex for matching date at start of line: e.g. 25 Aug 2026, 25-08-2026, 25/08/2026, 2026-08-25
+    const dateRegex = /^(\d{1,2}[\/\-\s](?:[A-Za-z]{3}|\d{1,2})[\/\-\s]\d{2,4}|\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/i;
+
+    // Header / footer markers to skip
+    const isHeaderOrFooter = (line: string): boolean => {
+      const lower = line.toLowerCase();
+      return (
+        lower.includes('account statement') ||
+        lower.includes('state bank of india') ||
+        lower.includes('statement of account') ||
+        lower.includes('txn date') ||
+        lower.includes('value date') ||
+        lower.includes('ref no./cheque no') ||
+        lower.includes('page no') ||
+        lower.includes('branch code') ||
+        lower.includes('ifs code') ||
+        lower.includes('cif no') ||
+        lower.includes('opening balance') ||
+        lower.includes('closing balance') ||
+        lower.includes('balance as on') ||
+        lower.includes('end of statement') ||
+        lower.includes('computer generated')
+      );
+    };
+
+    interface RawBlock {
+      lines: string[];
+      dateStr: string;
+      valueDateStr?: string;
+    }
+
+    const blocks: RawBlock[] = [];
+    let currentBlock: RawBlock | null = null;
 
     for (let i = 0; i < textLines.length; i++) {
       const line = textLines[i].trim();
       if (!line) continue;
+      if (isHeaderOrFooter(line)) continue;
 
       const dateMatch = line.match(dateRegex);
       if (dateMatch) {
-        const dateStr = dateMatch[1];
-        const rest = line.slice(dateMatch[0].length).trim();
-
-        // Extract monetary amounts at the end of the line
-        // Pattern: [Debit] [Credit] [Balance] or single amount
-        const amountMatches = rest.match(/([\d,]+\.\d{2})/g);
-
-        let debit: number | undefined;
-        let credit: number | undefined;
-        let balance: number | undefined;
-        let description = rest;
-
-        if (amountMatches && amountMatches.length > 0) {
-          const parsedAmounts = amountMatches.map((a) => parseFloat(a.replace(/,/g, '')));
-          if (parsedAmounts.length === 1) {
-            // Check if line indicates DR or CR
-            if (rest.toUpperCase().includes('CR') || rest.toUpperCase().includes('BY TRANSFER')) {
-              credit = parsedAmounts[0];
-            } else {
-              debit = parsedAmounts[0];
-            }
-          } else if (parsedAmounts.length >= 2) {
-            // Often: [TxAmount] [Balance]
-            balance = parsedAmounts[parsedAmounts.length - 1];
-            const txAmt = parsedAmounts[0];
-            if (rest.toUpperCase().includes('CR') || rest.toUpperCase().includes('BY TRANSFER')) {
-              credit = txAmt;
-            } else {
-              debit = txAmt;
-            }
-          }
-
-          // Clean description by removing trailing amount strings
-          for (const amt of amountMatches) {
-            description = description.replace(amt, '');
-          }
-          description = description.replace(/CR|DR/gi, '').trim();
+        if (currentBlock) {
+          blocks.push(currentBlock);
         }
 
-        rows.push({
-          date: dateStr,
-          description: description || 'Bank Transaction',
-          debit,
-          credit,
-          balance,
-        });
+        const dateStr = dateMatch[1];
+        let rest = line.slice(dateMatch[0].length).trim();
+        let valueDateStr: string | undefined;
+
+        // Check if second date (Value Date) immediately follows Txn Date
+        const valueDateMatch = rest.match(dateRegex);
+        if (valueDateMatch) {
+          valueDateStr = valueDateMatch[1];
+          rest = rest.slice(valueDateMatch[0].length).trim();
+        }
+
+        currentBlock = {
+          lines: [rest],
+          dateStr,
+          valueDateStr,
+        };
+      } else if (currentBlock) {
+        // Multi-line continuation of current transaction row
+        currentBlock.lines.push(line);
       }
+    }
+
+    if (currentBlock) {
+      blocks.push(currentBlock);
+    }
+
+    let prevBalance: number | undefined;
+
+    for (const block of blocks) {
+      const fullText = block.lines.join(' ').replace(/\s+/g, ' ').trim();
+      const amountMatches = fullText.match(/([\d,]+\.\d{2})/g);
+
+      let debit: number | undefined;
+      let credit: number | undefined;
+      let balance: number | undefined;
+      let txAmount = 0;
+
+      if (amountMatches && amountMatches.length > 0) {
+        const parsedAmounts = amountMatches.map((a) => parseFloat(a.replace(/,/g, '')));
+        if (parsedAmounts.length === 1) {
+          txAmount = parsedAmounts[0];
+        } else if (parsedAmounts.length >= 2) {
+          txAmount = parsedAmounts[0];
+          balance = parsedAmounts[parsedAmounts.length - 1];
+        }
+      }
+
+      // Determine Debit vs Credit direction
+      const upper = fullText.toUpperCase();
+      const isExplicitDebit =
+        upper.includes('/DR/') ||
+        upper.includes('TO TRANSFER') ||
+        upper.includes(' WITHDRAWAL') ||
+        upper.includes(' DEBIT');
+
+      const isExplicitCredit =
+        upper.includes('/CR/') ||
+        upper.includes('BY TRANSFER') ||
+        upper.includes(' DEPOSIT') ||
+        upper.includes(' CREDIT') ||
+        upper.includes('REFUND') ||
+        upper.includes('REVERSAL') ||
+        upper.includes('CASHBACK') ||
+        upper.includes('INTEREST') ||
+        upper.includes('SALARY');
+
+      if (isExplicitCredit && !isExplicitDebit) {
+        credit = txAmount;
+      } else if (isExplicitDebit && !isExplicitCredit) {
+        debit = txAmount;
+      } else if (prevBalance !== undefined && balance !== undefined) {
+        // Balance delta verification
+        if (balance > prevBalance) {
+          credit = txAmount;
+        } else {
+          debit = txAmount;
+        }
+      } else if (isExplicitCredit) {
+        credit = txAmount;
+      } else {
+        debit = txAmount;
+      }
+
+      if (balance !== undefined) {
+        prevBalance = balance;
+      }
+
+      // Clean raw description by removing trailing amount and balance tokens
+      let description = fullText;
+      if (amountMatches && amountMatches.length > 0) {
+        // Remove only the amounts at the end of the text
+        for (const amt of amountMatches) {
+          const lastIdx = description.lastIndexOf(amt);
+          if (lastIdx !== -1) {
+            description = (description.slice(0, lastIdx) + description.slice(lastIdx + amt.length)).trim();
+          }
+        }
+      }
+
+      // Remove trailing standalone CR/DR markers if attached to balance
+      description = description.replace(/\s+(?:CR|DR)$/i, '').trim();
+
+      rows.push({
+        date: block.dateStr,
+        valueDate: block.valueDateStr,
+        description: description || 'Bank Transaction',
+        debit,
+        credit,
+        balance,
+      });
     }
 
     return rows;
