@@ -1,0 +1,6 @@
+{
+  "name": "Money Flow",
+  "description": "A sleek, mobile-first personal finance management application with instant tracking, intuitive budgets, accounts overview, and smart statement import.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
