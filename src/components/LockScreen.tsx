@@ -19,14 +19,18 @@ export const LockScreen: React.FC = () => {
 
   // Trigger biometric prompt on mount if biometric unlock is enabled
   useEffect(() => {
-    if (isAppLocked && securitySettings.biometricEnabled && !autoPromptRef.current) {
+    const shouldAutoPrompt =
+      securitySettings.biometricEnabled &&
+      securitySettings.biometricMode !== 'pin_first';
+
+    if (isAppLocked && shouldAutoPrompt && !autoPromptRef.current) {
       autoPromptRef.current = true;
       const timer = setTimeout(() => {
         handleBiometricAuth();
       }, 400);
       return () => clearTimeout(timer);
     }
-  }, [isAppLocked, securitySettings.biometricEnabled]);
+  }, [isAppLocked, securitySettings.biometricEnabled, securitySettings.biometricMode]);
 
   // Reset state when lock state changes
   useEffect(() => {
@@ -130,13 +134,16 @@ export const LockScreen: React.FC = () => {
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1A1A1A] border border-[#2B2B2B] text-[11px] text-[#AAAAAA]">
           <span
             className={`w-2 h-2 rounded-full ${
-              biometricCapability.hasPlatformAuthenticator ? 'bg-[#10B981]' : 'bg-[#D4AF37]'
+              biometricCapability.isEnrolled
+                ? 'bg-[#10B981]'
+                : biometricCapability.hasPlatformAuthenticator
+                ? 'bg-[#10B981]'
+                : 'bg-[#D4AF37]'
             } animate-pulse`}
           />
           <span>
-            {biometricCapability.hasPlatformAuthenticator
-              ? 'Device Biometrics (Fingerprint/Face) Ready'
-              : 'Biometric & PIN Security'}
+            {biometricCapability.platformLabel || 'Device Biometrics Ready'}
+            {biometricCapability.isEnrolled ? ' • Enrolled' : ''}
           </span>
         </div>
       </div>
@@ -165,18 +172,20 @@ export const LockScreen: React.FC = () => {
               />
 
               <span
-                className={`material-symbols-outlined text-[38px] transition-colors ${
+                className={`material-symbols-outlined text-[38px] transition-colors material-symbols-fill ${
                   isScanning
                     ? 'text-[#10B981] animate-pulse'
                     : 'text-[#D4AF37] group-hover:text-[#F3E5AB]'
                 }`}
               >
-                fingerprint
+                {biometricCapability.platformIcon || 'fingerprint'}
               </span>
             </button>
 
             <span className="font-body text-[12px] font-semibold text-[#888888] group-hover:text-[#D4AF37] transition-colors">
-              {isScanning ? 'Scanning biometrics...' : 'Touch to Unlock (Fingerprint / Face)'}
+              {isScanning
+                ? 'Scanning sensor...'
+                : `Touch to Unlock (${biometricCapability.platformLabel || 'Biometrics'})`}
             </span>
           </div>
         )}

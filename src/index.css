@@ -40,14 +40,26 @@
     font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
   }
 
-  /* Safe areas */
+  /* Safe areas for mobile notches, dynamic islands, and status bars */
   .pb-safe {
-    padding-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
+    padding-bottom: 16px;
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
   }
   
   .pt-safe {
-    padding-top: max(env(safe-area-inset-top, 0px), 12px);
+    padding-top: 18px;
+    padding-top: max(env(safe-area-inset-top, 0px), 18px);
   }
+}
+
+/* Standalone utility classes for safe-area insets */
+.pt-safe {
+  padding-top: 18px;
+  padding-top: max(env(safe-area-inset-top, 0px), 18px);
+}
+.pb-safe {
+  padding-bottom: 16px;
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
 }
 
 /* Hide scrollbars for clean mobile app feel */

@@ -28,7 +28,7 @@ import { StatementService } from '../services/statementService';
 import { ImportService } from '../services/importService';
 import { TransactionService } from '../services/transactionService';
 import { KOTAK_SAMPLE_STATEMENT_TEXT } from '../services/kotakStatementParser';
-import { BiometricService, BiometricCapability } from '../services/biometricService';
+import { BiometricService, BiometricCapability, AuthResult } from '../services/biometricService';
 
 interface FinanceContextType {
   tab: ScreenTab;
@@ -97,6 +97,9 @@ interface FinanceContextType {
   unlockApp: (enteredPin?: string) => boolean;
   lockApp: () => void;
   authenticateWithBiometric: () => Promise<boolean>;
+  verifyBiometricForAction: (actionLabel?: string) => Promise<boolean>;
+  enrollBiometric: () => Promise<AuthResult>;
+  removeBiometric: () => void;
   biometricCapability: BiometricCapability;
   // Activity Filtering
   activityFilterType: 'all' | 'income' | 'expense' | 'transfer' | 'refund';
@@ -267,6 +270,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     autoLockTimeout: '1min',
     privacyScreen: true,
     highValueAuth: true,
+    biometricMode: 'biometric_preferred',
+    requireBiometricsForSecurityChanges: true,
   };
 
   const [securitySettings, setSecuritySettings] = useState<SecuritySettings>(() => {
@@ -296,6 +301,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [biometricCapability, setBiometricCapability] = useState<BiometricCapability>({
     isSupported: false,
     hasPlatformAuthenticator: false,
+    authenticatorType: 'fingerprint',
+    platformLabel: 'Biometrics',
+    platformIcon: 'fingerprint',
+    isEnrolled: false,
   });
 
   useEffect(() => {
@@ -342,6 +351,27 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return true;
     }
     return false;
+  };
+
+  const verifyBiometricForAction = async (actionLabel: string = 'Security Verification'): Promise<boolean> => {
+    const result = await BiometricService.authenticateWithBiometrics(actionLabel);
+    return result.success;
+  };
+
+  const enrollBiometric = async (): Promise<AuthResult> => {
+    const result = await BiometricService.registerBiometricCredential('Money Flow Vault Owner');
+    if (result.success) {
+      const cap = await BiometricService.checkBiometricCapability();
+      setBiometricCapability(cap);
+      updateSecuritySettings({ biometricEnabled: true });
+    }
+    return result;
+  };
+
+  const removeBiometric = () => {
+    BiometricService.removeBiometricCredential();
+    BiometricService.checkBiometricCapability().then(setBiometricCapability);
+    updateSecuritySettings({ biometricEnabled: false });
   };
 
   // Auto-lock on app background/visibility change based on autoLockTimeout
@@ -1221,6 +1251,9 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         unlockApp,
         lockApp,
         authenticateWithBiometric,
+        verifyBiometricForAction,
+        enrollBiometric,
+        removeBiometric,
         biometricCapability,
         activityFilterType,
         setActivityFilterType,

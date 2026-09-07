@@ -18,7 +18,7 @@ export const DashboardScreen: React.FC = () => {
   const recentTransactions = transactions.slice(0, 4);
 
   return (
-    <div className="flex flex-col w-full max-w-md mx-auto px-5 pt-2 pb-28 gap-7">
+    <div className="flex flex-col w-full max-w-md mx-auto px-5 pt-4 sm:pt-5 pb-28 gap-7">
       {/* Main Balance & High Level Stats */}
       <section className="flex flex-col gap-6 items-center text-center mt-2 relative">
         {/* Subtle gold glow behind balance */}

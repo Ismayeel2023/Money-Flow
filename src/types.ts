@@ -159,6 +159,8 @@ export interface SecuritySettings {
   autoLockTimeout: 'immediate' | '1min' | '5min' | '15min' | 'never';
   privacyScreen: boolean;
   highValueAuth: boolean;
+  biometricMode?: 'biometric_preferred' | 'biometric_strict' | 'pin_first';
+  requireBiometricsForSecurityChanges?: boolean;
 }
 
 export type ScreenTab =

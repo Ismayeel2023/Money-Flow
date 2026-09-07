@@ -27,7 +27,7 @@ export const SettingsScreen: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col w-full max-w-md mx-auto px-5 pt-1 pb-32 gap-5">
+    <div className="flex flex-col w-full max-w-md mx-auto px-5 pt-4 sm:pt-5 pb-32 gap-5">
       {/* Hidden file input for statement upload */}
       <input
         type="file"

@@ -74,7 +74,7 @@ export const SmsParserScreen: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col w-full max-w-xl mx-auto px-4 pt-2 pb-32 gap-5">
+    <div className="flex flex-col w-full max-w-xl mx-auto px-4 pt-4 sm:pt-5 pb-32 gap-5">
       {/* Top Banner */}
       <div className="bg-[#1A1A1A] border border-[#262626] rounded-2xl p-5 flex items-center justify-between">
         <div className="flex items-center gap-3">

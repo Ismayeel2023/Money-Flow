@@ -15,7 +15,7 @@ export const ReportsScreen: React.FC = () => {
   const totalSpent = topSpendings.reduce((sum, item) => sum + item.amount, 0) || 1;
 
   return (
-    <div className="flex flex-col w-full max-w-md mx-auto px-5 pt-1 pb-32 gap-6">
+    <div className="flex flex-col w-full max-w-md mx-auto px-5 pt-4 sm:pt-5 pb-32 gap-6">
       {/* Monthly Summary Card */}
       <section className="bg-[#1A1A1A] rounded-3xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.3)] border border-[#262626]">
         <h3 className="font-display text-[20px] font-bold text-[#FFFFFF] mb-4">

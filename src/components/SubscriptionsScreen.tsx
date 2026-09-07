@@ -70,7 +70,7 @@ export const SubscriptionsScreen: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col w-full max-w-xl mx-auto px-4 pt-2 pb-32 gap-5">
+    <div className="flex flex-col w-full max-w-xl mx-auto px-4 pt-4 sm:pt-5 pb-32 gap-5">
       {/* Header & Monthly Cost Banner */}
       <div className="bg-[#1A1A1A] border border-[#262626] rounded-3xl p-6 relative overflow-hidden shadow-sm">
         <div className="absolute inset-0 bg-gradient-to-br from-[#D4AF37]/10 via-transparent to-transparent opacity-60 pointer-events-none" />

@@ -48,7 +48,7 @@ export const CategoriesScreen: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col w-full max-w-md mx-auto px-5 pt-2 pb-32 gap-5">
+    <div className="flex flex-col w-full max-w-md mx-auto px-5 pt-4 sm:pt-5 pb-32 gap-5">
       {/* Top Header Card */}
       <div className="bg-[#1A1A1A] rounded-3xl p-5 border border-[#262626] shadow-sm flex flex-col gap-3">
         <div className="flex items-center justify-between">

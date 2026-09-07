@@ -216,7 +216,7 @@ export const AddTransactionScreen: React.FC = () => {
   const currentSegmentIndex = segmentTypes.findIndex((s) => s.value === type);
 
   return (
-    <div className="flex flex-col w-full max-w-md mx-auto px-5 pt-2 pb-36 gap-6">
+    <div className="flex flex-col w-full max-w-md mx-auto px-5 pt-4 sm:pt-5 pb-36 gap-6">
       {/* Amount Input Section */}
       <div className="flex flex-col items-center justify-center pt-3 pb-2 gap-2">
         <div className="text-[#888888] font-body font-bold tracking-widest text-[11px] uppercase">

@@ -207,7 +207,7 @@ export const ActivityScreen: React.FC = () => {
   const selectedAccountObj = accounts.find((a) => a.id === selectedAccount);
 
   return (
-    <div className="flex flex-col w-full max-w-md mx-auto px-5 pt-3 pb-32 gap-4">
+    <div className="flex flex-col w-full max-w-md mx-auto px-5 pt-4 sm:pt-5 pb-32 gap-4">
       {/* Search & Filter Header Section */}
       <div className="flex flex-col gap-3" ref={dropdownRef}>
         {/* Search Bar */}

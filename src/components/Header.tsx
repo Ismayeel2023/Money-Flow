@@ -61,8 +61,8 @@ export const Header: React.FC<HeaderProps> = ({
     (tab !== 'dashboard' && tab !== 'activity' && tab !== 'budgets' && tab !== 'settings');
 
   return (
-    <header className="fixed top-0 left-0 right-0 w-full z-50 bg-[#0F0F0F]/90 backdrop-blur-xl pt-safe border-b border-[#222222] transition-all duration-300">
-      <div className="max-w-md mx-auto h-20 px-5 flex items-center justify-between">
+    <header className="sticky top-0 left-0 right-0 w-full z-40 bg-[#0F0F0F]/95 backdrop-blur-xl pt-safe border-b border-[#222222] transition-all duration-200">
+      <div className="max-w-md mx-auto h-16 sm:h-18 px-5 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {isSubScreen ? (
             <div className="flex items-center gap-2">
@@ -74,7 +74,7 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <span className="material-symbols-outlined text-[24px]">arrow_back_ios_new</span>
               </button>
-              <h1 className="font-display font-semibold text-[22px] tracking-tight text-[#E0E0E0]">
+              <h1 className="font-display font-semibold text-[20px] sm:text-[22px] tracking-tight text-[#E0E0E0]">
                 {getDisplayTitle()}
               </h1>
             </div>
@@ -88,7 +88,7 @@ export const Header: React.FC<HeaderProps> = ({
                   (e.currentTarget as HTMLImageElement).src = './logo.png';
                 }}
               />
-              <span className="font-display font-bold text-[24px] text-[#D4AF37] tracking-tight">
+              <span className="font-display font-bold text-[22px] sm:text-[24px] text-[#D4AF37] tracking-tight">
                 {getDisplayTitle()}
               </span>
             </div>

@@ -89,7 +89,7 @@ const MainContent: React.FC = () => {
         return <ReportsScreen />;
       case 'category-spending':
         return (
-          <div className="flex flex-col w-full max-w-md mx-auto px-5 pt-2 pb-32">
+          <div className="flex flex-col w-full max-w-md mx-auto px-5 pt-4 sm:pt-5 pb-32">
             <CategorySpendingAnalysis />
           </div>
         );
@@ -204,8 +204,8 @@ const MainContent: React.FC = () => {
       {/* Header */}
       <Header {...getHeaderProps()} />
 
-      {/* Main Content View with paddingTop to account for fixed header */}
-      <main className="flex-1 pt-20 overflow-x-hidden">
+      {/* Main Content View with natural document flow under sticky header */}
+      <main className="flex-1 overflow-x-hidden">
         {renderScreen()}
       </main>
 

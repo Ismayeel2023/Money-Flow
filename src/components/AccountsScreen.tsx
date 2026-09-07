@@ -16,7 +16,7 @@ export const AccountsScreen: React.FC = () => {
   const creditAccounts = accounts.filter((a) => a.type === 'credit');
 
   return (
-    <div className="flex flex-col w-full max-w-md mx-auto px-5 pt-2 pb-32 gap-6">
+    <div className="flex flex-col w-full max-w-md mx-auto px-5 pt-4 sm:pt-5 pb-32 gap-6">
       {/* Total Net Worth Card */}
       <section className="bg-[#1A1A1A] rounded-3xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.5)] border border-[#262626] relative overflow-hidden">
         {/* Glows */}

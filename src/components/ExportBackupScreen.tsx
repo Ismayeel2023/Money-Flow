@@ -74,7 +74,7 @@ export const ExportBackupScreen: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col w-full max-w-xl mx-auto px-4 pt-2 pb-32 gap-5">
+    <div className="flex flex-col w-full max-w-xl mx-auto px-4 pt-4 sm:pt-5 pb-32 gap-5">
       <input
         type="file"
         ref={fileInputRef}
