@@ -11,13 +11,15 @@ export const ActivityScreen: React.FC = () => {
     setActiveTransactionForDetail,
     activityFilterType,
     setActivityFilterType,
+    activityFilterAccount,
+    setActivityFilterAccount,
     setTab,
   } = useFinance();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string>(activityFilterType || 'all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  const [selectedAccount, setSelectedAccount] = useState<string>('all');
+  const [selectedAccount, setSelectedAccount] = useState<string>(activityFilterAccount || 'all');
   const [timeFilter, setTimeFilter] = useState<'all' | 'month' | 'week'>('all');
   const [activeDropdown, setActiveDropdown] = useState<'time' | 'type' | 'category' | 'account' | null>(null);
   const [isListening, setIsListening] = useState(false);
@@ -30,6 +32,13 @@ export const ActivityScreen: React.FC = () => {
       setSelectedType(activityFilterType);
     }
   }, [activityFilterType]);
+
+  // Sync with global activity filter account from Accounts Screen clicks
+  useEffect(() => {
+    if (activityFilterAccount) {
+      setSelectedAccount(activityFilterAccount);
+    }
+  }, [activityFilterAccount]);
 
   // Close dropdown on outside click or touch
   useEffect(() => {

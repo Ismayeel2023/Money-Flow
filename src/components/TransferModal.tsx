@@ -1,14 +1,39 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFinance } from '../context/FinanceContext';
 import { CustomDropdown } from './CustomDropdown';
 
 export const TransferModal: React.FC = () => {
-  const { accounts, transferMoney, isTransferModalOpen, setIsTransferModalOpen } = useFinance();
+  const {
+    accounts,
+    transferMoney,
+    isTransferModalOpen,
+    setIsTransferModalOpen,
+    transferPreselectedFromAccount,
+    setTransferPreselectedFromAccount,
+  } = useFinance();
 
   const [fromAccount, setFromAccount] = useState<string>(accounts[0]?.id || 'acc-sbi');
   const [toAccount, setToAccount] = useState<string>(accounts[1]?.id || 'acc-hdfc');
   const [amountStr, setAmountStr] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
+
+  // Sync preselected fromAccount when modal opens
+  useEffect(() => {
+    if (isTransferModalOpen && transferPreselectedFromAccount) {
+      setFromAccount(transferPreselectedFromAccount);
+      const other = accounts.find((a) => a.id !== transferPreselectedFromAccount);
+      if (other) {
+        setToAccount(other.id);
+      }
+    }
+  }, [isTransferModalOpen, transferPreselectedFromAccount, accounts]);
+
+  const handleClose = () => {
+    setIsTransferModalOpen(false);
+    if (setTransferPreselectedFromAccount) {
+      setTransferPreselectedFromAccount(null);
+    }
+  };
 
   if (!isTransferModalOpen) return null;
 
@@ -19,7 +44,7 @@ export const TransferModal: React.FC = () => {
     if (fromAccount === toAccount) return;
 
     transferMoney(fromAccount, toAccount, amount, notes);
-    setIsTransferModalOpen(false);
+    handleClose();
     setAmountStr('');
     setNotes('');
   };
@@ -30,7 +55,7 @@ export const TransferModal: React.FC = () => {
         {/* Close button */}
         <button
           type="button"
-          onClick={() => setIsTransferModalOpen(false)}
+          onClick={handleClose}
           className="absolute top-5 right-5 w-8 h-8 rounded-full bg-[#262626] text-[#888888] flex items-center justify-center hover:bg-[#333333] hover:text-white cursor-pointer transition-colors"
         >
           <span className="material-symbols-outlined text-[20px]">close</span>

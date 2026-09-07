@@ -46,7 +46,10 @@ interface FinanceContextType {
   deleteTransaction: (id: string) => void;
   addAccount: (account: Omit<Account, 'id'>) => Account;
   updateAccount: (id: string, updates: Partial<Account>) => void;
+  deleteAccount: (id: string) => boolean;
   transferMoney: (fromAccountId: string, toAccountId: string, amount: number, notes?: string) => void;
+  transferPreselectedFromAccount: string | null;
+  setTransferPreselectedFromAccount: (accountId: string | null) => void;
   addCategory: (input: CategoryInput) => Category;
   updateCategory: (id: string, updates: Partial<CategoryInput>) => Category;
   deleteCategory: (id: string) => boolean;
@@ -104,6 +107,8 @@ interface FinanceContextType {
   // Activity Filtering
   activityFilterType: 'all' | 'income' | 'expense' | 'transfer' | 'refund';
   setActivityFilterType: (type: 'all' | 'income' | 'expense' | 'transfer' | 'refund') => void;
+  activityFilterAccount: string;
+  setActivityFilterAccount: (accountId: string) => void;
   showTransactionsByType: (type: 'income' | 'expense') => void;
   // Computed metrics
   totalBalance: number;
@@ -404,6 +409,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Activity filter state for cross-screen navigation
   const [activityFilterType, setActivityFilterType] = useState<'all' | 'income' | 'expense' | 'transfer' | 'refund'>('all');
+  const [activityFilterAccount, setActivityFilterAccount] = useState<string>('all');
+  const [transferPreselectedFromAccount, setTransferPreselectedFromAccount] = useState<string | null>(null);
 
   const showTransactionsByType = (type: 'income' | 'expense') => {
     setActivityFilterType(type);
@@ -680,6 +687,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setAccounts((prev) =>
       prev.map((acc) => (acc.id === id ? { ...acc, ...updates } : acc))
     );
+  };
+
+  const deleteAccount = (id: string): boolean => {
+    if (accounts.length <= 1) {
+      return false;
+    }
+    setAccounts((prev) => prev.filter((acc) => acc.id !== id));
+    return true;
   };
 
   const transferMoney = (
@@ -1201,7 +1216,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         deleteTransaction,
         addAccount,
         updateAccount,
+        deleteAccount,
         transferMoney,
+        transferPreselectedFromAccount,
+        setTransferPreselectedFromAccount,
         addCategory,
         updateCategory,
         deleteCategory,
@@ -1257,6 +1275,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         biometricCapability,
         activityFilterType,
         setActivityFilterType,
+        activityFilterAccount,
+        setActivityFilterAccount,
         showTransactionsByType,
         totalBalance,
         totalIncome,
