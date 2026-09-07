@@ -1,6 +1,7 @@
 import React from 'react';
 import { useFinance } from '../context/FinanceContext';
 import { ScreenTab } from '../types';
+import logoImg from '../assets/logo.png';
 
 interface HeaderProps {
   title?: string;
@@ -15,7 +16,7 @@ export const Header: React.FC<HeaderProps> = ({
   onBack,
   rightAction,
 }) => {
-  const { tab, setTab, setIsProfileModalOpen } = useFinance();
+  const { tab, setTab, goBack, setIsProfileModalOpen, lockApp } = useFinance();
 
   const getDisplayTitle = () => {
     if (title) return title;
@@ -51,32 +52,13 @@ export const Header: React.FC<HeaderProps> = ({
     if (onBack) {
       onBack();
     } else {
-      if (
-        tab === 'categories' ||
-        tab === 'rules' ||
-        tab === 'accounts' ||
-        tab === 'reports'
-      ) {
-        setTab('settings');
-      } else if (tab === 'import-review') {
-        setTab('import-statement');
-      } else if (tab === 'import-statement') {
-        setTab('settings');
-      } else {
-        setTab('dashboard');
-      }
+      goBack();
     }
   };
 
   const isSubScreen =
     showBack ||
-    tab === 'add-transaction' ||
-    tab === 'categories' ||
-    tab === 'rules' ||
-    tab === 'accounts' ||
-    tab === 'reports' ||
-    tab === 'import-statement' ||
-    tab === 'import-review';
+    (tab !== 'dashboard' && tab !== 'activity' && tab !== 'budgets' && tab !== 'settings');
 
   return (
     <header className="fixed top-0 left-0 right-0 w-full z-50 bg-[#0F0F0F]/90 backdrop-blur-xl pt-safe border-b border-[#222222] transition-all duration-300">
@@ -99,9 +81,12 @@ export const Header: React.FC<HeaderProps> = ({
           ) : (
             <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => setTab('dashboard')}>
               <img
-                alt="Money Flow Logo"
-                className="h-8 w-auto object-contain transition-transform hover:scale-105"
-                src="https://lh3.googleusercontent.com/aida/AEtjO1X4ePx3CYNLCY5LLTTiQHaUbrnIl6E10MK9H7nIjDU_d_rxexR3B4tpsZyU_If-6gE2Yj1cZ29dD948cAQfd7HxsmtTus2PDuY2rxuCUQw9Xu0HlU6nCnylVte1K-L_p6n3TACNPlh8PNfduDqqHsPj2i_XVdfUWC5IfbrMIduY36hB_d3gDJHmUjv0v-DSdsAeXvp5EwuYKxE7uRzc0cNzNr6o2ky4JgDRigrZg3Rp5YvWGFyHm-X8UcAs"
+                alt="Money Flow"
+                className="h-8 w-auto object-contain transition-transform hover:scale-105 rounded-lg"
+                src={logoImg}
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = './logo.png';
+                }}
               />
               <span className="font-display font-bold text-[24px] text-[#D4AF37] tracking-tight">
                 {getDisplayTitle()}
@@ -122,14 +107,25 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="material-symbols-outlined text-[20px]">info</span>
             </button>
           ) : (
-            <button
-              id="header-profile-btn"
-              onClick={() => setIsProfileModalOpen(true)}
-              aria-label="User Profile"
-              className="w-10 h-10 rounded-full bg-[#D4AF37] flex items-center justify-center shadow-[0_2px_12px_rgba(212,175,55,0.3)] hover:bg-[#E5C158] active:scale-95 transition-all text-[#0F0F0F]"
-            >
-              <span className="material-symbols-outlined text-[20px] font-bold">person</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                id="header-lock-btn"
+                onClick={lockApp}
+                aria-label="Lock App with Biometrics"
+                title="Lock Vault with Biometrics / PIN"
+                className="w-9 h-9 rounded-full bg-[#1F1F1F] border border-[#333333] flex items-center justify-center text-[#A0A0A0] hover:text-[#D4AF37] hover:border-[#D4AF37]/40 active:scale-95 transition-all"
+              >
+                <span className="material-symbols-outlined text-[18px]">lock</span>
+              </button>
+              <button
+                id="header-profile-btn"
+                onClick={() => setIsProfileModalOpen(true)}
+                aria-label="User Profile"
+                className="w-10 h-10 rounded-full bg-[#D4AF37] flex items-center justify-center shadow-[0_2px_12px_rgba(212,175,55,0.3)] hover:bg-[#E5C158] active:scale-95 transition-all text-[#0F0F0F]"
+              >
+                <span className="material-symbols-outlined text-[20px] font-bold">person</span>
+              </button>
+            </div>
           )}
         </div>
       </div>

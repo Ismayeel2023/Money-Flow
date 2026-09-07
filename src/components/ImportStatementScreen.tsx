@@ -2,7 +2,7 @@ import React from 'react';
 import { useFinance } from '../context/FinanceContext';
 
 export const ImportStatementScreen: React.FC = () => {
-  const { importSummary, setTab, processStatementUpload } = useFinance();
+  const { importSummary, setTab, goBack, processStatementUpload, processKotakDemoStatement, formatCurrency } = useFinance();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -35,11 +35,28 @@ export const ImportStatementScreen: React.FC = () => {
           <h1 className="font-display text-[26px] sm:text-[28px] font-bold text-[#FFFFFF]">
             {importSummary.totalFound > 0 ? 'Statement Processed' : 'Import Statement'}
           </h1>
-          <p className="font-body text-[14px] text-[#888888] max-w-[280px]">
+          <p className="font-body text-[14px] text-[#888888] max-w-[320px]">
             {importSummary.totalFound > 0
               ? `Found ${importSummary.totalFound} transactions from ${importSummary.fileName}.`
-              : 'Upload your bank or UPI PDF / CSV statement to auto-import transactions.'}
+              : 'Upload your Kotak, SBI, or other bank PDF/CSV statement to extract transactions.'}
           </p>
+
+          {/* Detected Bank Banner */}
+          {importSummary.totalFound > 0 && importSummary.detectedBank && (
+            <div className="mt-3 px-4 py-2 rounded-2xl bg-[#D4AF37]/10 border border-[#D4AF37]/30 flex items-center gap-2 text-left">
+              <span className="material-symbols-outlined text-[#D4AF37] text-[20px]">account_balance</span>
+              <div>
+                <span className="text-[13px] font-bold text-[#FFFFFF] block">
+                  {importSummary.detectedBank}
+                  {importSummary.accountNumber ? ` • A/C ${importSummary.accountNumber}` : ''}
+                </span>
+                <span className="text-[11px] text-[#A0A0A0]">
+                  {importSummary.openingBalance !== undefined ? `Open: ${formatCurrency(importSummary.openingBalance)} • ` : ''}
+                  {importSummary.closingBalance !== undefined ? `Close: ${formatCurrency(importSummary.closingBalance)}` : ''}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -50,8 +67,66 @@ export const ImportStatementScreen: React.FC = () => {
             className="w-full bg-[#D4AF37] hover:bg-[#E5C158] text-[#0F0F0F] rounded-full py-4 font-body text-[16px] font-bold shadow-[0_8px_24px_rgba(212,175,55,0.25)] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
           >
             <span className="material-symbols-outlined text-[20px] font-bold">file_upload</span>
-            <span>Choose Statement File</span>
+            <span>Choose Statement File (PDF / CSV)</span>
           </button>
+
+          <div className="relative flex items-center justify-center my-1">
+            <div className="border-t border-[#262626] w-full" />
+            <span className="bg-[#0F0F0F] px-3 text-[12px] text-[#666666] uppercase font-bold tracking-wider absolute">
+              or test sample statement
+            </span>
+          </div>
+
+          {/* 1-Click Demo Statements */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <button
+              onClick={() => processKotakDemoStatement()}
+              className="bg-[#1A1A1A] hover:bg-[#242424] border border-[#ED1C24]/30 hover:border-[#ED1C24] p-3.5 rounded-2xl text-left flex items-center gap-3 transition-all active:scale-[0.98]"
+            >
+              <div className="w-10 h-10 rounded-xl bg-[#ED1C24]/15 text-[#ED1C24] flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[20px]">account_balance</span>
+              </div>
+              <div>
+                <span className="font-body text-[13px] font-bold text-[#FFFFFF] block">
+                  Kotak Statement PDF
+                </span>
+                <span className="font-body text-[11px] text-[#888888]">
+                  Account 8056016402 (UPI & Cafe)
+                </span>
+              </div>
+            </button>
+
+            <button
+              onClick={() => processStatementUpload(null)}
+              className="bg-[#1A1A1A] hover:bg-[#242424] border border-[#3525cd]/30 hover:border-[#3525cd] p-3.5 rounded-2xl text-left flex items-center gap-3 transition-all active:scale-[0.98]"
+            >
+              <div className="w-10 h-10 rounded-xl bg-[#3525cd]/15 text-[#6366f1] flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[20px]">account_balance</span>
+              </div>
+              <div>
+                <span className="font-body text-[13px] font-bold text-[#FFFFFF] block">
+                  SBI Statement PDF
+                </span>
+                <span className="font-body text-[11px] text-[#888888]">
+                  Account 4589 (Swiggy & Salary)
+                </span>
+              </div>
+            </button>
+          </div>
+
+          {/* Supported Formats Info */}
+          <div className="bg-[#141414] border border-[#222222] rounded-2xl p-4 flex flex-col gap-2">
+            <span className="text-[12px] font-bold text-[#888888] tracking-wider uppercase">
+              Supported Bank Formats
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {['Kotak Mahindra Bank', 'State Bank of India (SBI)', 'HDFC Bank', 'ICICI Bank', 'Standard CSV'].map((b) => (
+                <span key={b} className="text-[11px] bg-[#1E1E1E] text-[#B0B0B0] px-2.5 py-1 rounded-full border border-[#2A2A2A]">
+                  {b}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       ) : (
         <>
@@ -176,7 +251,7 @@ export const ImportStatementScreen: React.FC = () => {
 
             <button
               id="btn-cancel-import"
-              onClick={() => setTab('settings')}
+              onClick={() => goBack()}
               className="w-full bg-transparent text-[#D4AF37] hover:bg-[#D4AF37]/10 rounded-full py-4 font-body text-[15px] font-bold border border-[#D4AF37]/30 active:scale-[0.98] transition-all"
             >
               Cancel Import

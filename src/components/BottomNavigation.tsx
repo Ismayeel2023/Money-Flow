@@ -3,20 +3,17 @@ import { useFinance } from '../context/FinanceContext';
 import { ScreenTab } from '../types';
 
 export const BottomNavigation: React.FC = () => {
-  const { tab, setTab } = useFinance();
+  const { tab, setTab, tabHistory } = useFinance();
 
-  const isHomeActive = tab === 'dashboard';
-  const isActivityActive = tab === 'activity';
-  const isBudgetsActive = tab === 'budgets';
-  const isMoreActive =
-    tab === 'settings' ||
-    tab === 'accounts' ||
-    tab === 'import-statement' ||
-    tab === 'import-review' ||
-    tab === 'reports';
+  const rootOrigin = tabHistory && tabHistory.length > 0 ? tabHistory[0] : 'dashboard';
+
+  const isHomeActive = tab === 'dashboard' || (rootOrigin === 'dashboard' && tab !== 'activity' && tab !== 'budgets' && tab !== 'settings');
+  const isActivityActive = tab === 'activity' || (rootOrigin === 'activity' && tab !== 'dashboard' && tab !== 'budgets' && tab !== 'settings');
+  const isBudgetsActive = tab === 'budgets' || (rootOrigin === 'budgets' && tab !== 'dashboard' && tab !== 'activity' && tab !== 'settings');
+  const isMoreActive = tab === 'settings' || (rootOrigin === 'settings' && tab !== 'dashboard' && tab !== 'activity' && tab !== 'budgets');
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 w-full z-50 pb-safe px-4 pointer-events-none">
+    <nav className="fixed bottom-0 left-0 right-0 w-full z-40 pb-safe px-4 pointer-events-none">
       <div className="max-w-md mx-auto pointer-events-auto">
         <div className="bg-[#1A1A1A]/95 backdrop-blur-xl rounded-[28px] mb-3 flex items-center justify-around h-20 shadow-[0_8px_32px_rgba(0,0,0,0.6)] border border-[#2A2A2A] px-2">
           {/* Home */}

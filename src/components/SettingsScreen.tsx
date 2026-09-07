@@ -1,11 +1,15 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { useFinance } from '../context/FinanceContext';
+import { AndroidApkModal } from './AndroidApkModal';
 
 export const SettingsScreen: React.FC = () => {
+  const [isAndroidModalOpen, setIsAndroidModalOpen] = useState(false);
   const {
     setTab,
     processStatementUpload,
     setIsProfileModalOpen,
+    setIsSecurityModalOpen,
+    setIsAppSettingsModalOpen,
     resetToDemoData,
   } = useFinance();
 
@@ -159,6 +163,34 @@ export const SettingsScreen: React.FC = () => {
 
           <div className="h-[1px] w-full bg-[#262626] ml-16" />
 
+          {/* Category Spending Analysis */}
+          <button
+            id="settings-item-category-spending"
+            onClick={() => setTab('category-spending')}
+            className="flex items-center justify-between p-4 hover:bg-[#222222] active:bg-[#262626] transition-colors text-left group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[#D4AF37]/15 text-[#D4AF37] flex items-center justify-center">
+                <span className="material-symbols-outlined text-[20px] material-symbols-fill">
+                  query_stats
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="font-body text-[15px] font-semibold text-[#E0E0E0]">
+                  Category Spending Analysis
+                </span>
+                <span className="font-body text-[12px] text-[#888888]">
+                  Calculate spending for a category and date range
+                </span>
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-[#888888] group-active:translate-x-1 transition-transform">
+              chevron_right
+            </span>
+          </button>
+
+          <div className="h-[1px] w-full bg-[#262626] ml-16" />
+
           {/* Automation Rules */}
           <button
             id="settings-item-rules"
@@ -188,7 +220,7 @@ export const SettingsScreen: React.FC = () => {
           {/* People & Merchants */}
           <button
             id="settings-item-merchants"
-            onClick={() => setTab('activity')}
+            onClick={() => setTab('merchants')}
             className="flex items-center justify-between p-4 hover:bg-[#222222] active:bg-[#262626] transition-colors text-left group"
           >
             <div className="flex items-center gap-3">
@@ -200,6 +232,88 @@ export const SettingsScreen: React.FC = () => {
               <span className="font-body text-[15px] font-semibold text-[#E0E0E0]">
                 People &amp; Merchants
               </span>
+            </div>
+            <span className="material-symbols-outlined text-[#888888] group-active:translate-x-1 transition-transform">
+              chevron_right
+            </span>
+          </button>
+
+          <div className="h-[1px] w-full bg-[#262626] ml-16" />
+
+          {/* Subscriptions & Recurring */}
+          <button
+            id="settings-item-subscriptions"
+            onClick={() => setTab('subscriptions')}
+            className="flex items-center justify-between p-4 hover:bg-[#222222] active:bg-[#262626] transition-colors text-left group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[#D4AF37]/15 text-[#D4AF37] flex items-center justify-center">
+                <span className="material-symbols-outlined text-[20px] material-symbols-fill">
+                  autorenew
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="font-body text-[15px] font-semibold text-[#E0E0E0]">
+                  Subscriptions &amp; Recurring
+                </span>
+                <span className="font-body text-[12px] text-[#888888]">
+                  Track renewals, SIPs &amp; commitments
+                </span>
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-[#888888] group-active:translate-x-1 transition-transform">
+              chevron_right
+            </span>
+          </button>
+
+          <div className="h-[1px] w-full bg-[#262626] ml-16" />
+
+          {/* Savings Goals & Sinking Funds */}
+          <button
+            id="settings-item-goals"
+            onClick={() => setTab('goals')}
+            className="flex items-center justify-between p-4 hover:bg-[#222222] active:bg-[#262626] transition-colors text-left group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[#10B981]/15 text-[#10B981] flex items-center justify-center">
+                <span className="material-symbols-outlined text-[20px] material-symbols-fill">
+                  savings
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="font-body text-[15px] font-semibold text-[#E0E0E0]">
+                  Savings Goals &amp; Funds
+                </span>
+                <span className="font-body text-[12px] text-[#888888]">
+                  Emergency funds &amp; target trackers
+                </span>
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-[#888888] group-active:translate-x-1 transition-transform">
+              chevron_right
+            </span>
+          </button>
+
+          <div className="h-[1px] w-full bg-[#262626] ml-16" />
+
+          {/* SMS & Clipboard UPI Parser */}
+          <button
+            id="settings-item-sms-parser"
+            onClick={() => setTab('sms-parser')}
+            className="flex items-center justify-between p-4 hover:bg-[#222222] active:bg-[#262626] transition-colors text-left group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-blue-500/15 text-blue-400 flex items-center justify-center">
+                <span className="material-symbols-outlined text-[20px]">sms</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="font-body text-[15px] font-semibold text-[#E0E0E0]">
+                  SMS / Clipboard UPI Parser
+                </span>
+                <span className="font-body text-[12px] text-[#888888]">
+                  Auto-detect amount, ref &amp; merchant from text
+                </span>
+              </div>
             </div>
             <span className="material-symbols-outlined text-[#888888] group-active:translate-x-1 transition-transform">
               chevron_right
@@ -237,32 +351,24 @@ export const SettingsScreen: React.FC = () => {
 
           <div className="h-[1px] w-full bg-[#262626] ml-16" />
 
-          {/* Backup & Restore */}
+          {/* Backup, CSV Export & Restore */}
           <button
             id="settings-item-backup"
-            onClick={() => {
-              const data = {
-                exportedAt: new Date().toISOString(),
-                version: '1.0',
-              };
-              const blob = new Blob([JSON.stringify(data, null, 2)], {
-                type: 'application/json',
-              });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `moneyflow_backup_${Date.now()}.json`;
-              a.click();
-            }}
+            onClick={() => setTab('export-backup')}
             className="flex items-center justify-between p-4 hover:bg-[#222222] active:bg-[#262626] transition-colors text-left group"
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-[#333333] text-[#A0A0A0] flex items-center justify-center">
                 <span className="material-symbols-outlined text-[20px]">cloud_sync</span>
               </div>
-              <span className="font-body text-[15px] font-semibold text-[#E0E0E0]">
-                Backup &amp; Restore
-              </span>
+              <div className="flex flex-col">
+                <span className="font-body text-[15px] font-semibold text-[#E0E0E0]">
+                  Export, Backup &amp; Restore
+                </span>
+                <span className="font-body text-[12px] text-[#888888]">
+                  Excel CSV, JSON snapshot &amp; PDF reports
+                </span>
+              </div>
             </div>
             <span className="material-symbols-outlined text-[#888888] group-active:translate-x-1 transition-transform">
               chevron_right
@@ -274,7 +380,7 @@ export const SettingsScreen: React.FC = () => {
           {/* Security */}
           <button
             id="settings-item-security"
-            onClick={() => setIsProfileModalOpen(true)}
+            onClick={() => setIsSecurityModalOpen(true)}
             className="flex items-center justify-between p-4 hover:bg-[#222222] active:bg-[#262626] transition-colors text-left group"
           >
             <div className="flex items-center gap-3">
@@ -294,10 +400,36 @@ export const SettingsScreen: React.FC = () => {
 
           <div className="h-[1px] w-full bg-[#262626] ml-16" />
 
+          {/* Android App & APK Build */}
+          <button
+            id="settings-item-android-apk"
+            onClick={() => setIsAndroidModalOpen(true)}
+            className="flex items-center justify-between p-4 hover:bg-[#222222] active:bg-[#262626] transition-colors text-left group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[#3DDC84]/15 text-[#3DDC84] flex items-center justify-center">
+                <span className="material-symbols-outlined text-[20px]">android</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="font-body text-[15px] font-semibold text-[#E0E0E0]">
+                  Android App &amp; APK
+                </span>
+                <span className="font-body text-[12px] text-[#888888]">
+                  Direct phone install (WebAPK) &amp; APK build
+                </span>
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-[#888888] group-active:translate-x-1 transition-transform">
+              chevron_right
+            </span>
+          </button>
+
+          <div className="h-[1px] w-full bg-[#262626] ml-16" />
+
           {/* App Settings */}
           <button
             id="settings-item-appsettings"
-            onClick={() => setIsProfileModalOpen(true)}
+            onClick={() => setIsAppSettingsModalOpen(true)}
             className="flex items-center justify-between p-4 hover:bg-[#222222] active:bg-[#262626] transition-colors text-left group"
           >
             <div className="flex items-center gap-3">
@@ -316,6 +448,12 @@ export const SettingsScreen: React.FC = () => {
           </button>
         </div>
       </section>
+
+      {/* Android APK Modal */}
+      <AndroidApkModal
+        isOpen={isAndroidModalOpen}
+        onClose={() => setIsAndroidModalOpen(false)}
+      />
     </div>
   );
 };

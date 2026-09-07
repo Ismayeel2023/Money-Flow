@@ -11,6 +11,7 @@ export const DashboardScreen: React.FC = () => {
     transactions,
     formatCurrency,
     setTab,
+    showTransactionsByType,
     setActiveTransactionForDetail,
   } = useFinance();
 
@@ -51,34 +52,105 @@ export const DashboardScreen: React.FC = () => {
         {/* Income / Expense Split */}
         <div className="flex w-full gap-3 relative z-10">
           {/* Income Card */}
-          <div
+          <button
             id="card-income"
-            onClick={() => setTab('activity')}
-            className="flex-1 bg-[#1A1A1A] rounded-3xl p-4 sm:p-5 flex flex-col gap-1 shadow-[0_4px_24px_rgba(0,0,0,0.4)] border border-[#262626] hover:border-[#D4AF37]/30 hover:shadow-[0_8px_24px_rgba(0,0,0,0.6)] transition-all active:scale-[0.98] cursor-pointer text-left"
+            type="button"
+            onClick={() => showTransactionsByType('income')}
+            className="flex-1 bg-[#1A1A1A] rounded-3xl p-4 sm:p-5 flex flex-col gap-1 shadow-[0_4px_24px_rgba(0,0,0,0.4)] border border-[#262626] hover:border-[#10B981]/50 hover:shadow-[0_8px_24px_rgba(16,185,129,0.15)] transition-all active:scale-[0.98] cursor-pointer text-left group"
           >
-            <div className="w-10 h-10 rounded-full bg-[#10B981]/15 flex items-center justify-center mb-1 text-[#34D399]">
-              <span className="material-symbols-outlined text-[20px]">arrow_downward</span>
+            <div className="flex items-center justify-between w-full mb-1">
+              <div className="w-10 h-10 rounded-full bg-[#10B981]/15 flex items-center justify-center text-[#34D399] group-hover:scale-110 transition-transform">
+                <span className="material-symbols-outlined text-[20px]">arrow_downward</span>
+              </div>
+              <span className="text-[11px] font-bold text-[#34D399] opacity-80 group-hover:opacity-100 flex items-center gap-0.5">
+                <span>View</span>
+                <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+              </span>
             </div>
             <span className="font-body text-[12px] font-bold text-[#888888]">Income</span>
             <span className="font-display text-[22px] sm:text-[24px] font-bold text-[#E0E0E0]">
               {formatCurrency(totalIncome)}
             </span>
-          </div>
+          </button>
 
           {/* Expenses Card */}
-          <div
+          <button
             id="card-expenses"
-            onClick={() => setTab('activity')}
-            className="flex-1 bg-[#1A1A1A] rounded-3xl p-4 sm:p-5 flex flex-col gap-1 shadow-[0_4px_24px_rgba(0,0,0,0.4)] border border-[#262626] hover:border-[#F43F5E]/30 hover:shadow-[0_8px_24px_rgba(0,0,0,0.6)] transition-all active:scale-[0.98] cursor-pointer text-left"
+            type="button"
+            onClick={() => showTransactionsByType('expense')}
+            className="flex-1 bg-[#1A1A1A] rounded-3xl p-4 sm:p-5 flex flex-col gap-1 shadow-[0_4px_24px_rgba(0,0,0,0.4)] border border-[#262626] hover:border-[#F43F5E]/50 hover:shadow-[0_8px_24px_rgba(244,63,94,0.15)] transition-all active:scale-[0.98] cursor-pointer text-left group"
           >
-            <div className="w-10 h-10 rounded-full bg-[#F43F5E]/15 flex items-center justify-center mb-1 text-[#FB7185]">
-              <span className="material-symbols-outlined text-[20px]">arrow_upward</span>
+            <div className="flex items-center justify-between w-full mb-1">
+              <div className="w-10 h-10 rounded-full bg-[#F43F5E]/15 flex items-center justify-center text-[#FB7185] group-hover:scale-110 transition-transform">
+                <span className="material-symbols-outlined text-[20px]">arrow_upward</span>
+              </div>
+              <span className="text-[11px] font-bold text-[#FB7185] opacity-80 group-hover:opacity-100 flex items-center gap-0.5">
+                <span>View</span>
+                <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+              </span>
             </div>
             <span className="font-body text-[12px] font-bold text-[#888888]">Expenses</span>
             <span className="font-display text-[22px] sm:text-[24px] font-bold text-[#E0E0E0]">
               {formatCurrency(totalExpenses)}
             </span>
-          </div>
+          </button>
+        </div>
+      </section>
+
+      {/* Quick Financial Hub */}
+      <section className="flex flex-col gap-2.5">
+        <div className="grid grid-cols-4 gap-2">
+          {/* Import Statement */}
+          <button
+            onClick={() => setTab('import-statement')}
+            className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl bg-[#1A1A1A] border border-[#262626] hover:border-[#D4AF37]/50 active:scale-95 transition-all text-center group"
+          >
+            <div className="w-10 h-10 rounded-full bg-[#D4AF37]/15 text-[#D4AF37] flex items-center justify-center group-hover:scale-105 transition-transform">
+              <span className="material-symbols-outlined text-[20px]">upload_file</span>
+            </div>
+            <span className="text-[11px] font-semibold text-[#CCCCCC] leading-tight">
+              Import Statement
+            </span>
+          </button>
+
+          {/* Subscriptions */}
+          <button
+            onClick={() => setTab('subscriptions')}
+            className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl bg-[#1A1A1A] border border-[#262626] hover:border-[#D4AF37]/50 active:scale-95 transition-all text-center group"
+          >
+            <div className="w-10 h-10 rounded-full bg-[#8B5CF6]/15 text-[#A78BFA] flex items-center justify-center group-hover:scale-105 transition-transform">
+              <span className="material-symbols-outlined text-[20px]">autorenew</span>
+            </div>
+            <span className="text-[11px] font-semibold text-[#CCCCCC] leading-tight">
+              Recurring &amp; Subs
+            </span>
+          </button>
+
+          {/* Savings Goals */}
+          <button
+            onClick={() => setTab('goals')}
+            className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl bg-[#1A1A1A] border border-[#262626] hover:border-[#D4AF37]/50 active:scale-95 transition-all text-center group"
+          >
+            <div className="w-10 h-10 rounded-full bg-[#10B981]/15 text-[#34D399] flex items-center justify-center group-hover:scale-105 transition-transform">
+              <span className="material-symbols-outlined text-[20px]">savings</span>
+            </div>
+            <span className="text-[11px] font-semibold text-[#CCCCCC] leading-tight">
+              Savings Goals
+            </span>
+          </button>
+
+          {/* SMS UPI Detect */}
+          <button
+            onClick={() => setTab('sms-parser')}
+            className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl bg-[#1A1A1A] border border-[#262626] hover:border-[#D4AF37]/50 active:scale-95 transition-all text-center group"
+          >
+            <div className="w-10 h-10 rounded-full bg-blue-500/15 text-blue-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+              <span className="material-symbols-outlined text-[20px]">sms</span>
+            </div>
+            <span className="text-[11px] font-semibold text-[#CCCCCC] leading-tight">
+              SMS / UPI Parser
+            </span>
+          </button>
         </div>
       </section>
 

@@ -1,4 +1,4 @@
-import { Account, Budget, Category, Transaction } from '../types';
+import { Account, Budget, Category, SavingsGoal, Subscription, Transaction } from '../types';
 
 export const INITIAL_CATEGORIES: Category[] = [
   {
@@ -56,11 +56,74 @@ export const INITIAL_CATEGORIES: Category[] = [
     isSystem: true,
   },
   {
+    id: 'cat-bills',
+    name: 'Bills & Utilities',
+    icon: 'receipt',
+    color: '#e11d48',
+    bgColor: 'bg-rose-500/10 text-rose-400',
+    type: 'expense',
+    isSystem: true,
+  },
+  {
+    id: 'cat-health',
+    name: 'Health & Medical',
+    icon: 'medical_services',
+    color: '#0284c7',
+    bgColor: 'bg-sky-500/10 text-sky-400',
+    type: 'expense',
+    isSystem: true,
+  },
+  {
     id: 'cat-salary',
     name: 'Salary',
     icon: 'payments',
     color: '#006c49',
-    bgColor: 'bg-secondary-container text-on-secondary-container',
+    bgColor: 'bg-[#10B981]/15 text-[#34D399]',
+    type: 'income',
+    isSystem: true,
+  },
+  {
+    id: 'cat-freelance',
+    name: 'Freelance & Projects',
+    icon: 'work',
+    color: '#0ea5e9',
+    bgColor: 'bg-[#0284c7]/15 text-[#38bdf8]',
+    type: 'income',
+    isSystem: true,
+  },
+  {
+    id: 'cat-investment',
+    name: 'Investments & Dividends',
+    icon: 'trending_up',
+    color: '#10b981',
+    bgColor: 'bg-[#059669]/15 text-[#34d399]',
+    type: 'income',
+    isSystem: true,
+  },
+  {
+    id: 'cat-rental',
+    name: 'Rental Income',
+    icon: 'real_estate_agent',
+    color: '#8b5cf6',
+    bgColor: 'bg-[#7c3aed]/15 text-[#a78bfa]',
+    type: 'income',
+    isSystem: true,
+  },
+  {
+    id: 'cat-gifts',
+    name: 'Gifts & Grants',
+    icon: 'redeem',
+    color: '#ec4899',
+    bgColor: 'bg-[#db2777]/15 text-[#f472b6]',
+    type: 'income',
+    isSystem: true,
+  },
+  {
+    id: 'cat-other-income',
+    name: 'Other Income',
+    icon: 'account_balance_wallet',
+    color: '#d97706',
+    bgColor: 'bg-[#d97706]/15 text-[#fbbf24]',
     type: 'income',
     isSystem: true,
   },
@@ -77,17 +140,17 @@ export const INITIAL_CATEGORIES: Category[] = [
 
 export const INITIAL_ACCOUNTS: Account[] = [
   {
-    id: 'acc-sbi',
-    name: 'SBI Savings',
+    id: 'acc-primary',
+    name: 'Main Bank Account',
     type: 'bank',
-    accountNumber: '4589',
     balance: 0,
     icon: 'account_balance',
     color: '#3525cd',
+    isDefault: true,
   },
   {
     id: 'acc-cash',
-    name: 'Wallet Cash',
+    name: 'Cash Wallet',
     type: 'cash',
     balance: 0,
     icon: 'payments',
@@ -102,7 +165,7 @@ export const INITIAL_BUDGETS: Budget[] = [
     categoryName: 'Food & Dining',
     categoryIcon: 'restaurant',
     categoryColor: '#006c49',
-    allocated: 5000,
+    allocated: 0,
     spent: 0,
     period: 'monthly',
     status: 'healthy',
@@ -113,7 +176,7 @@ export const INITIAL_BUDGETS: Budget[] = [
     categoryName: 'Shopping',
     categoryIcon: 'shopping_bag',
     categoryColor: '#ba1a1a',
-    allocated: 5000,
+    allocated: 0,
     spent: 0,
     period: 'monthly',
     status: 'healthy',
@@ -124,7 +187,7 @@ export const INITIAL_BUDGETS: Budget[] = [
     categoryName: 'Transport',
     categoryIcon: 'directions_car',
     categoryColor: '#3525cd',
-    allocated: 3000,
+    allocated: 0,
     spent: 0,
     period: 'monthly',
     status: 'healthy',
@@ -135,3 +198,6 @@ export const INITIAL_TRANSACTIONS: Transaction[] = [];
 
 export const INITIAL_IMPORT_BATCH: Transaction[] = [];
 
+export const INITIAL_SUBSCRIPTIONS: Subscription[] = [];
+
+export const INITIAL_SAVINGS_GOALS: SavingsGoal[] = [];

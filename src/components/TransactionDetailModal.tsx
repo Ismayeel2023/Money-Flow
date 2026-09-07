@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useFinance } from '../context/FinanceContext';
 import { RuleEngineService } from '../services/ruleEngine';
+import { CustomDropdown } from './CustomDropdown';
 
 export const TransactionDetailModal: React.FC = () => {
   const {
@@ -27,6 +28,14 @@ export const TransactionDetailModal: React.FC = () => {
   const isDuplicate = tx.status === 'duplicate' || tx.isDuplicate;
   const isPossibleDuplicate = tx.possibleDuplicate;
   const isReview = tx.status === 'review';
+
+  const eligibleCategories = useMemo(() => {
+    return categories.filter((c) =>
+      tx.type === 'income'
+        ? c.type === 'income' || c.type === 'both'
+        : c.type === 'expense' || c.type === 'both'
+    );
+  }, [categories, tx.type]);
 
   const handleStartEdit = () => {
     setMerchant(tx.merchant);
@@ -93,7 +102,7 @@ export const TransactionDetailModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
       <div className="bg-[#1A1A1A] rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-[#262626] relative flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
         {/* Close Button */}
         <button
@@ -188,24 +197,24 @@ export const TransactionDetailModal: React.FC = () => {
               />
             </div>
 
-            <div className="bg-[#262626] rounded-2xl p-3 flex flex-col gap-1 border border-[#383838] relative">
-              <label className="font-body text-[10px] font-bold text-[#888888] uppercase">
+            <div className="flex flex-col gap-1">
+              <label className="font-body text-[10px] font-bold text-[#888888] uppercase tracking-wider">
                 Category
               </label>
-              <select
+              <CustomDropdown
+                id="transaction-detail-category-dropdown"
                 value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="bg-transparent font-body text-[14px] font-semibold text-[#FFFFFF] outline-none appearance-none pr-6 cursor-pointer"
-              >
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id} className="bg-[#1A1A1A] text-[#E0E0E0]">
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              <span className="material-symbols-outlined text-[#888888] text-[18px] pointer-events-none absolute right-3 bottom-3">
-                arrow_drop_down
-              </span>
+                onChange={(newCatId) => setCategoryId(newCatId)}
+                options={eligibleCategories.map((c) => ({
+                  id: c.id,
+                  label: c.name,
+                  icon: c.icon,
+                  color: c.color,
+                  sublabel: c.type === 'both' ? 'Flexible' : `${c.type}`,
+                }))}
+                placeholder="Select category"
+                className="w-full"
+              />
             </div>
 
             <div className="bg-[#262626] rounded-2xl p-3 flex flex-col gap-1 border border-[#383838]">

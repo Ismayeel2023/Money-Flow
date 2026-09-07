@@ -34,9 +34,15 @@ export class CategoryService {
         this.saveCategories(INITIAL_CATEGORIES);
         return INITIAL_CATEGORIES;
       }
-      // Ensure system categories are flagged appropriately
+      // Ensure all system categories from INITIAL_CATEGORIES are present
       const initialSystemIds = new Set(INITIAL_CATEGORIES.map((c) => c.id));
-      return parsed.map((cat) => {
+      const existingIds = new Set(parsed.map((c) => c.id));
+      const missingSystem = INITIAL_CATEGORIES.filter((c) => !existingIds.has(c.id));
+      const combined = [...parsed, ...missingSystem];
+      if (missingSystem.length > 0) {
+        this.saveCategories(combined);
+      }
+      return combined.map((cat) => {
         if (initialSystemIds.has(cat.id)) {
           return { ...cat, isSystem: true };
         }

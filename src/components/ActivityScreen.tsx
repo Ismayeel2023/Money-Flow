@@ -9,10 +9,13 @@ export const ActivityScreen: React.FC = () => {
     accounts,
     formatCurrency,
     setActiveTransactionForDetail,
+    activityFilterType,
+    setActivityFilterType,
+    setTab,
   } = useFinance();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedType, setSelectedType] = useState<string>('all');
+  const [selectedType, setSelectedType] = useState<string>(activityFilterType || 'all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedAccount, setSelectedAccount] = useState<string>('all');
   const [timeFilter, setTimeFilter] = useState<'all' | 'month' | 'week'>('all');
@@ -21,16 +24,51 @@ export const ActivityScreen: React.FC = () => {
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown on outside click
+  // Sync with global activity filter type from Dashboard clicks
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    if (activityFilterType) {
+      setSelectedType(activityFilterType);
+    }
+  }, [activityFilterType]);
+
+  // Close dropdown on outside click or touch
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setActiveDropdown(null);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
   }, []);
+
+  // Filter categories shown in dropdown based on selectedType
+  const displayedCategories = useMemo(() => {
+    if (selectedType === 'income') {
+      return categories.filter((c) => c.type === 'income');
+    }
+    if (selectedType === 'expense') {
+      return categories.filter((c) => c.type === 'expense');
+    }
+    return categories;
+  }, [categories, selectedType]);
+
+  const handleTypeSelect = (typeKey: string) => {
+    setSelectedType(typeKey);
+    setActivityFilterType(typeKey as any);
+    setActiveDropdown(null);
+    // If a category was selected that does not match the new type, reset to 'all'
+    if (typeKey !== 'all' && selectedCategory !== 'all') {
+      const cat = categories.find((c) => c.id === selectedCategory);
+      if (cat && cat.type !== typeKey) {
+        setSelectedCategory('all');
+      }
+    }
+  };
 
   // Filter Transactions
   const filteredTransactions = useMemo(() => {
@@ -135,6 +173,7 @@ export const ActivityScreen: React.FC = () => {
   const handleResetFilters = () => {
     setSearchQuery('');
     setSelectedType('all');
+    setActivityFilterType('all');
     setSelectedCategory('all');
     setSelectedAccount('all');
     setTimeFilter('all');
@@ -212,249 +251,280 @@ export const ActivityScreen: React.FC = () => {
           </div>
         </div>
 
-        {/* Filter Chips Horizontal Scroll */}
-        <div className="relative">
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
-            {/* Time Filter Pill */}
-            <div className="relative shrink-0">
-              <button
-                type="button"
-                onClick={() =>
-                  setActiveDropdown(activeDropdown === 'time' ? null : 'time')
-                }
-                className={`h-9 px-3.5 rounded-full font-body text-[12px] font-bold flex items-center gap-1.5 transition-all ${
-                  timeFilter !== 'all'
-                    ? 'bg-[#D4AF37] text-[#0F0F0F] shadow-[0_2px_8px_rgba(212,175,55,0.3)]'
-                    : 'bg-[#1A1A1A] hover:bg-[#262626] text-[#A0A0A0] hover:text-[#E0E0E0] border border-[#2A2A2A]'
-                }`}
-              >
-                <span>
-                  {timeFilter === 'all'
-                    ? 'All Time'
-                    : timeFilter === 'month'
-                    ? 'This Month'
-                    : 'This Week'}
-                </span>
-                <span className="material-symbols-outlined text-[15px]">
-                  {activeDropdown === 'time' ? 'arrow_drop_up' : 'arrow_drop_down'}
-                </span>
-              </button>
+        {/* Filter Chips Container - Wrapped to prevent overflow clipping */}
+        <div className="flex flex-wrap items-center gap-2 relative z-30">
+          {/* Transparent Backdrop to dismiss dropdowns on mobile or desktop */}
+          {activeDropdown && (
+            <div
+              className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[1px]"
+              onClick={() => setActiveDropdown(null)}
+            />
+          )}
 
-              {activeDropdown === 'time' && (
-                <div className="absolute top-11 left-0 z-40 w-40 bg-[#222222] border border-[#333333] rounded-2xl p-1.5 shadow-2xl flex flex-col gap-1 animate-fadeIn">
-                  {[
-                    { key: 'all', label: 'All Time' },
-                    { key: 'month', label: 'This Month' },
-                    { key: 'week', label: 'This Week' },
-                  ].map((item) => (
-                    <button
-                      key={item.key}
-                      onClick={() => {
-                        setTimeFilter(item.key as any);
-                        setActiveDropdown(null);
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-xl text-[12px] font-bold transition-colors ${
-                        timeFilter === item.key
-                          ? 'bg-[#D4AF37] text-[#0F0F0F]'
-                          : 'text-[#E0E0E0] hover:bg-[#2E2E2E]'
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+          {/* Time Filter Pill */}
+          <div className={`relative shrink-0 ${activeDropdown === 'time' ? 'z-50' : 'z-10'}`}>
+            <button
+              type="button"
+              onClick={() =>
+                setActiveDropdown(activeDropdown === 'time' ? null : 'time')
+              }
+              className={`h-9 px-3.5 rounded-full font-body text-[12px] font-bold flex items-center gap-1.5 transition-all ${
+                timeFilter !== 'all'
+                  ? 'bg-[#D4AF37] text-[#0F0F0F] shadow-[0_2px_8px_rgba(212,175,55,0.3)]'
+                  : 'bg-[#1A1A1A] hover:bg-[#262626] text-[#A0A0A0] hover:text-[#E0E0E0] border border-[#2A2A2A]'
+              }`}
+            >
+              <span>
+                {timeFilter === 'all'
+                  ? 'All Time'
+                  : timeFilter === 'month'
+                  ? 'This Month'
+                  : 'This Week'}
+              </span>
+              <span className="material-symbols-outlined text-[15px]">
+                {activeDropdown === 'time' ? 'arrow_drop_up' : 'arrow_drop_down'}
+              </span>
+            </button>
 
-            {/* Type Filter Pill */}
-            <div className="relative shrink-0">
-              <button
-                type="button"
-                onClick={() =>
-                  setActiveDropdown(activeDropdown === 'type' ? null : 'type')
-                }
-                className={`h-9 px-3.5 rounded-full font-body text-[12px] font-bold flex items-center gap-1.5 transition-all ${
-                  selectedType !== 'all'
-                    ? 'bg-[#D4AF37] text-[#0F0F0F] shadow-[0_2px_8px_rgba(212,175,55,0.3)]'
-                    : 'bg-[#1A1A1A] hover:bg-[#262626] text-[#A0A0A0] hover:text-[#E0E0E0] border border-[#2A2A2A]'
-                }`}
-              >
-                <span>
-                  {selectedType === 'all'
-                    ? 'Type: All'
-                    : selectedType.charAt(0).toUpperCase() + selectedType.slice(1)}
-                </span>
-                <span className="material-symbols-outlined text-[15px]">
-                  {activeDropdown === 'type' ? 'arrow_drop_up' : 'arrow_drop_down'}
-                </span>
-              </button>
-
-              {activeDropdown === 'type' && (
-                <div className="absolute top-11 left-0 z-40 w-40 bg-[#222222] border border-[#333333] rounded-2xl p-1.5 shadow-2xl flex flex-col gap-1 animate-fadeIn">
-                  {[
-                    { key: 'all', label: 'All Types' },
-                    { key: 'expense', label: 'Expenses' },
-                    { key: 'income', label: 'Income' },
-                    { key: 'transfer', label: 'Transfers' },
-                  ].map((item) => (
-                    <button
-                      key={item.key}
-                      onClick={() => {
-                        setSelectedType(item.key);
-                        setActiveDropdown(null);
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-xl text-[12px] font-bold transition-colors ${
-                        selectedType === item.key
-                          ? 'bg-[#D4AF37] text-[#0F0F0F]'
-                          : 'text-[#E0E0E0] hover:bg-[#2E2E2E]'
-                      }`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Category Filter Pill */}
-            <div className="relative shrink-0">
-              <button
-                type="button"
-                onClick={() =>
-                  setActiveDropdown(activeDropdown === 'category' ? null : 'category')
-                }
-                className={`h-9 px-3.5 rounded-full font-body text-[12px] font-bold flex items-center gap-1.5 transition-all ${
-                  selectedCategory !== 'all'
-                    ? 'bg-[#D4AF37] text-[#0F0F0F] shadow-[0_2px_8px_rgba(212,175,55,0.3)]'
-                    : 'bg-[#1A1A1A] hover:bg-[#262626] text-[#A0A0A0] hover:text-[#E0E0E0] border border-[#2A2A2A]'
-                }`}
-              >
-                <span className="truncate max-w-[110px]">
-                  {selectedCategory === 'all'
-                    ? 'Category: All'
-                    : selectedCategoryObj?.name || 'Category'}
-                </span>
-                <span className="material-symbols-outlined text-[15px]">
-                  {activeDropdown === 'category' ? 'arrow_drop_up' : 'arrow_drop_down'}
-                </span>
-              </button>
-
-              {activeDropdown === 'category' && (
-                <div className="absolute top-11 left-0 z-40 w-52 max-h-60 overflow-y-auto bg-[#222222] border border-[#333333] rounded-2xl p-1.5 shadow-2xl flex flex-col gap-1 animate-fadeIn">
+            {activeDropdown === 'time' && (
+              <div className="absolute top-11 left-0 z-[60] w-44 bg-[#222222] border border-[#383838] rounded-2xl p-1.5 shadow-[0_16px_36px_rgba(0,0,0,0.85)] flex flex-col gap-1 animate-fadeIn">
+                {[
+                  { key: 'all', label: 'All Time' },
+                  { key: 'month', label: 'This Month' },
+                  { key: 'week', label: 'This Week' },
+                ].map((item) => (
                   <button
+                    key={item.key}
                     onClick={() => {
-                      setSelectedCategory('all');
+                      setTimeFilter(item.key as any);
                       setActiveDropdown(null);
                     }}
                     className={`w-full text-left px-3 py-2 rounded-xl text-[12px] font-bold transition-colors ${
-                      selectedCategory === 'all'
+                      timeFilter === item.key
                         ? 'bg-[#D4AF37] text-[#0F0F0F]'
                         : 'text-[#E0E0E0] hover:bg-[#2E2E2E]'
                     }`}
                   >
-                    All Categories
+                    {item.label}
                   </button>
-                  {categories.map((c) => (
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Type Filter Pill */}
+          <div className={`relative shrink-0 ${activeDropdown === 'type' ? 'z-50' : 'z-10'}`}>
+            <button
+              type="button"
+              onClick={() =>
+                setActiveDropdown(activeDropdown === 'type' ? null : 'type')
+              }
+              className={`h-9 px-3.5 rounded-full font-body text-[12px] font-bold flex items-center gap-1.5 transition-all ${
+                selectedType !== 'all'
+                  ? 'bg-[#D4AF37] text-[#0F0F0F] shadow-[0_2px_8px_rgba(212,175,55,0.3)]'
+                  : 'bg-[#1A1A1A] hover:bg-[#262626] text-[#A0A0A0] hover:text-[#E0E0E0] border border-[#2A2A2A]'
+              }`}
+            >
+              <span>
+                {selectedType === 'all'
+                  ? 'Type: All'
+                  : selectedType.charAt(0).toUpperCase() + selectedType.slice(1)}
+              </span>
+              <span className="material-symbols-outlined text-[15px]">
+                {activeDropdown === 'type' ? 'arrow_drop_up' : 'arrow_drop_down'}
+              </span>
+            </button>
+
+            {activeDropdown === 'type' && (
+              <div className="absolute top-11 left-0 z-[60] w-44 bg-[#222222] border border-[#383838] rounded-2xl p-1.5 shadow-[0_16px_36px_rgba(0,0,0,0.85)] flex flex-col gap-1 animate-fadeIn">
+                {[
+                  { key: 'all', label: 'All Types' },
+                  { key: 'expense', label: 'Expenses' },
+                  { key: 'income', label: 'Income' },
+                  { key: 'transfer', label: 'Transfers' },
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    onClick={() => handleTypeSelect(item.key)}
+                    className={`w-full text-left px-3 py-2 rounded-xl text-[12px] font-bold transition-colors ${
+                      selectedType === item.key
+                        ? 'bg-[#D4AF37] text-[#0F0F0F]'
+                        : 'text-[#E0E0E0] hover:bg-[#2E2E2E]'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Category Filter Pill */}
+          <div className={`relative shrink-0 ${activeDropdown === 'category' ? 'z-50' : 'z-10'}`}>
+            <button
+              type="button"
+              onClick={() =>
+                setActiveDropdown(activeDropdown === 'category' ? null : 'category')
+              }
+              className={`h-9 px-3.5 rounded-full font-body text-[12px] font-bold flex items-center gap-1.5 transition-all ${
+                selectedCategory !== 'all'
+                  ? 'bg-[#D4AF37] text-[#0F0F0F] shadow-[0_2px_8px_rgba(212,175,55,0.3)]'
+                  : 'bg-[#1A1A1A] hover:bg-[#262626] text-[#A0A0A0] hover:text-[#E0E0E0] border border-[#2A2A2A]'
+              }`}
+            >
+              <span className="truncate max-w-[125px]">
+                {selectedCategory !== 'all'
+                  ? selectedCategoryObj?.name || 'Category'
+                  : selectedType === 'income'
+                  ? 'Income: All'
+                  : selectedType === 'expense'
+                  ? 'Expense: All'
+                  : 'Category: All'}
+              </span>
+              <span className="material-symbols-outlined text-[15px]">
+                {activeDropdown === 'category' ? 'arrow_drop_up' : 'arrow_drop_down'}
+              </span>
+            </button>
+
+            {activeDropdown === 'category' && (
+              <div className="absolute top-11 right-0 sm:left-0 sm:right-auto z-[60] w-56 max-h-64 overflow-y-auto bg-[#222222] border border-[#383838] rounded-2xl p-1.5 shadow-[0_16px_36px_rgba(0,0,0,0.85)] flex flex-col gap-1 animate-fadeIn">
+                <button
+                  onClick={() => {
+                    setSelectedCategory('all');
+                    setActiveDropdown(null);
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded-xl text-[12px] font-bold transition-colors ${
+                    selectedCategory === 'all'
+                      ? 'bg-[#D4AF37] text-[#0F0F0F]'
+                      : 'text-[#E0E0E0] hover:bg-[#2E2E2E]'
+                  }`}
+                >
+                  {selectedType === 'income'
+                    ? 'All Income Categories'
+                    : selectedType === 'expense'
+                    ? 'All Expense Categories'
+                    : 'All Categories'}
+                </button>
+
+                {displayedCategories.length === 0 ? (
+                  <div className="px-3 py-3 text-[11px] text-[#888888] text-center font-medium">
+                    No categories for this transaction type
+                  </div>
+                ) : (
+                  displayedCategories.map((c) => (
                     <button
                       key={c.id}
                       onClick={() => {
                         setSelectedCategory(c.id);
                         setActiveDropdown(null);
                       }}
-                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] font-bold transition-colors text-left ${
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-[12px] font-bold transition-colors text-left ${
                         selectedCategory === c.id
                           ? 'bg-[#D4AF37] text-[#0F0F0F]'
                           : 'text-[#E0E0E0] hover:bg-[#2E2E2E]'
                       }`}
                     >
-                      <span className="material-symbols-outlined text-[16px]">
-                        {c.icon || 'category'}
-                      </span>
-                      <span className="truncate">{c.name}</span>
+                      <div className="flex items-center gap-2 truncate">
+                        <span className="material-symbols-outlined text-[16px]">
+                          {c.icon || 'category'}
+                        </span>
+                        <span className="truncate">{c.name}</span>
+                      </div>
+                      {selectedType === 'all' && (
+                        <span
+                          className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
+                            c.type === 'income'
+                              ? 'bg-[#10B981]/20 text-[#34D399]'
+                              : 'bg-[#2E2E2E] text-[#888888]'
+                          }`}
+                        >
+                          {c.type}
+                        </span>
+                      )}
                     </button>
-                  ))}
-                </div>
-              )}
-            </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
 
-            {/* Account Filter Pill */}
-            <div className="relative shrink-0">
-              <button
-                type="button"
-                onClick={() =>
-                  setActiveDropdown(activeDropdown === 'account' ? null : 'account')
-                }
-                className={`h-9 px-3.5 rounded-full font-body text-[12px] font-bold flex items-center gap-1.5 transition-all ${
-                  selectedAccount !== 'all'
-                    ? 'bg-[#D4AF37] text-[#0F0F0F] shadow-[0_2px_8px_rgba(212,175,55,0.3)]'
-                    : 'bg-[#1A1A1A] hover:bg-[#262626] text-[#A0A0A0] hover:text-[#E0E0E0] border border-[#2A2A2A]'
-                }`}
-              >
-                <span className="truncate max-w-[110px]">
-                  {selectedAccount === 'all'
-                    ? 'Account: All'
-                    : selectedAccountObj?.name || 'Account'}
-                </span>
-                <span className="material-symbols-outlined text-[15px]">
-                  {activeDropdown === 'account' ? 'arrow_drop_up' : 'arrow_drop_down'}
-                </span>
-              </button>
+          {/* Account Filter Pill */}
+          <div className={`relative shrink-0 ${activeDropdown === 'account' ? 'z-50' : 'z-10'}`}>
+            <button
+              type="button"
+              onClick={() =>
+                setActiveDropdown(activeDropdown === 'account' ? null : 'account')
+              }
+              className={`h-9 px-3.5 rounded-full font-body text-[12px] font-bold flex items-center gap-1.5 transition-all ${
+                selectedAccount !== 'all'
+                  ? 'bg-[#D4AF37] text-[#0F0F0F] shadow-[0_2px_8px_rgba(212,175,55,0.3)]'
+                  : 'bg-[#1A1A1A] hover:bg-[#262626] text-[#A0A0A0] hover:text-[#E0E0E0] border border-[#2A2A2A]'
+              }`}
+            >
+              <span className="truncate max-w-[110px]">
+                {selectedAccount === 'all'
+                  ? 'Account: All'
+                  : selectedAccountObj?.name || 'Account'}
+              </span>
+              <span className="material-symbols-outlined text-[15px]">
+                {activeDropdown === 'account' ? 'arrow_drop_up' : 'arrow_drop_down'}
+              </span>
+            </button>
 
-              {activeDropdown === 'account' && (
-                <div className="absolute top-11 right-0 z-40 w-52 bg-[#222222] border border-[#333333] rounded-2xl p-1.5 shadow-2xl flex flex-col gap-1 animate-fadeIn">
+            {activeDropdown === 'account' && (
+              <div className="absolute top-11 right-0 sm:left-0 sm:right-auto z-[60] w-52 bg-[#222222] border border-[#383838] rounded-2xl p-1.5 shadow-[0_16px_36px_rgba(0,0,0,0.85)] flex flex-col gap-1 animate-fadeIn">
+                <button
+                  onClick={() => {
+                    setSelectedAccount('all');
+                    setActiveDropdown(null);
+                  }}
+                  className={`w-full text-left px-3 py-2 rounded-xl text-[12px] font-bold transition-colors ${
+                    selectedAccount === 'all'
+                      ? 'bg-[#D4AF37] text-[#0F0F0F]'
+                      : 'text-[#E0E0E0] hover:bg-[#2E2E2E]'
+                  }`}
+                >
+                  All Accounts
+                </button>
+                {accounts.map((a) => (
                   <button
+                    key={a.id}
                     onClick={() => {
-                      setSelectedAccount('all');
+                      setSelectedAccount(a.id);
                       setActiveDropdown(null);
                     }}
-                    className={`w-full text-left px-3 py-2 rounded-xl text-[12px] font-bold transition-colors ${
-                      selectedAccount === 'all'
+                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] font-bold transition-colors text-left ${
+                      selectedAccount === a.id
                         ? 'bg-[#D4AF37] text-[#0F0F0F]'
                         : 'text-[#E0E0E0] hover:bg-[#2E2E2E]'
                     }`}
                   >
-                    All Accounts
+                    <span className="material-symbols-outlined text-[16px]">
+                      {a.type === 'bank'
+                        ? 'account_balance'
+                        : a.type === 'credit'
+                        ? 'credit_card'
+                        : 'payments'}
+                    </span>
+                    <span className="truncate">{a.name}</span>
                   </button>
-                  {accounts.map((a) => (
-                    <button
-                      key={a.id}
-                      onClick={() => {
-                        setSelectedAccount(a.id);
-                        setActiveDropdown(null);
-                      }}
-                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] font-bold transition-colors text-left ${
-                        selectedAccount === a.id
-                          ? 'bg-[#D4AF37] text-[#0F0F0F]'
-                          : 'text-[#E0E0E0] hover:bg-[#2E2E2E]'
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[16px]">
-                        {a.type === 'bank'
-                          ? 'account_balance'
-                          : a.type === 'credit'
-                          ? 'credit_card'
-                          : 'payments'}
-                      </span>
-                      <span className="truncate">{a.name}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Clear Filters Button */}
-            {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={handleResetFilters}
-                className="h-9 px-3 shrink-0 rounded-full bg-[#FB7185]/15 hover:bg-[#FB7185]/25 text-[#FB7185] border border-[#FB7185]/30 font-body text-[11px] font-bold flex items-center gap-1 transition-colors"
-                title="Reset all filters"
-              >
-                <span className="material-symbols-outlined text-[14px]">refresh</span>
-                <span>Reset</span>
-              </button>
+                ))}
+              </div>
             )}
           </div>
+
+          {/* Clear Filters Button */}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="h-9 px-3 shrink-0 rounded-full bg-[#FB7185]/15 hover:bg-[#FB7185]/25 text-[#FB7185] border border-[#FB7185]/30 font-body text-[11px] font-bold flex items-center gap-1 transition-colors z-30"
+              title="Reset all filters"
+            >
+              <span className="material-symbols-outlined text-[14px]">refresh</span>
+              <span>Reset</span>
+            </button>
+          )}
         </div>
 
         {/* Results summary bar */}
@@ -479,28 +549,114 @@ export const ActivityScreen: React.FC = () => {
 
       {/* Transaction List */}
       <div className="flex flex-col gap-5 pt-1">
+        {/* Active Type Filter Banner */}
+        {selectedType !== 'all' && (
+          <div
+            className={`flex items-center justify-between px-4 py-3 rounded-2xl border transition-all ${
+              selectedType === 'income'
+                ? 'bg-[#10B981]/10 border-[#10B981]/30 text-[#34D399]'
+                : selectedType === 'expense'
+                ? 'bg-[#F43F5E]/10 border-[#F43F5E]/30 text-[#FB7185]'
+                : 'bg-[#D4AF37]/10 border-[#D4AF37]/30 text-[#D4AF37]'
+            }`}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="material-symbols-outlined text-[20px] shrink-0">
+                {selectedType === 'income'
+                  ? 'arrow_downward'
+                  : selectedType === 'expense'
+                  ? 'arrow_upward'
+                  : 'swap_horiz'}
+              </span>
+              <div className="flex flex-col min-w-0">
+                <span className="font-body text-[13px] font-bold truncate">
+                  Showing {selectedType.charAt(0).toUpperCase() + selectedType.slice(1)} Transactions
+                </span>
+                <span className="font-body text-[11px] opacity-80">
+                  {filterStats.count} {filterStats.count === 1 ? 'record' : 'records'}
+                  {selectedType === 'income' && filterStats.incomeSum > 0 && ` • +${formatCurrency(filterStats.incomeSum)}`}
+                  {selectedType === 'expense' && filterStats.expenseSum > 0 && ` • -${formatCurrency(filterStats.expenseSum)}`}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {selectedType === 'income' ? (
+                <button
+                  type="button"
+                  onClick={() => handleTypeSelect('expense')}
+                  className="px-2.5 py-1 rounded-lg bg-[#262626] hover:bg-[#333333] text-[11px] font-semibold text-[#FB7185] transition-colors"
+                >
+                  Expenses
+                </button>
+              ) : selectedType === 'expense' ? (
+                <button
+                  type="button"
+                  onClick={() => handleTypeSelect('income')}
+                  className="px-2.5 py-1 rounded-lg bg-[#262626] hover:bg-[#333333] text-[11px] font-semibold text-[#34D399] transition-colors"
+                >
+                  Income
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => handleTypeSelect('all')}
+                className="px-2.5 py-1 rounded-lg bg-[#262626] hover:bg-[#333333] text-[11px] font-semibold text-[#E0E0E0] transition-colors"
+              >
+                All
+              </button>
+            </div>
+          </div>
+        )}
+
         {Object.keys(groupedTransactions).length === 0 ? (
           <div className="text-center py-12 text-[#888888] bg-[#1A1A1A] rounded-3xl p-8 border border-[#262626] flex flex-col items-center gap-3">
-            <div className="w-14 h-14 rounded-full bg-[#262626] flex items-center justify-center text-[#888888]">
-              <span className="material-symbols-outlined text-[28px]">search_off</span>
+            <div
+              className={`w-14 h-14 rounded-full flex items-center justify-center ${
+                selectedType === 'income'
+                  ? 'bg-[#10B981]/15 text-[#34D399]'
+                  : selectedType === 'expense'
+                  ? 'bg-[#F43F5E]/15 text-[#FB7185]'
+                  : 'bg-[#262626] text-[#888888]'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[28px]">
+                {selectedType === 'income'
+                  ? 'arrow_downward'
+                  : selectedType === 'expense'
+                  ? 'arrow_upward'
+                  : 'receipt_long'}
+              </span>
             </div>
             <p className="font-display text-[16px] font-bold text-[#E0E0E0]">
-              No transactions found
+              {selectedType === 'income'
+                ? 'No Income Transactions'
+                : selectedType === 'expense'
+                ? 'No Expense Transactions'
+                : 'No Transactions Found'}
             </p>
             <p className="font-body text-[13px] text-[#888888] max-w-xs">
               {hasActiveFilters
-                ? 'Try adjusting or clearing your search filters to find transactions.'
-                : 'No transactions recorded yet.'}
+                ? `No ${selectedType !== 'all' ? selectedType : ''} transactions match your current filters.`
+                : 'Your financial activity is clean. Add a transaction or import your statement to get started.'}
             </p>
-            {hasActiveFilters && (
+            <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
               <button
                 type="button"
-                onClick={handleResetFilters}
-                className="mt-2 bg-[#D4AF37] hover:bg-[#E5C158] text-[#0F0F0F] font-body text-[13px] font-bold px-4 py-2 rounded-full shadow-md active:scale-95 transition-all"
+                onClick={() => setTab('add-transaction')}
+                className="bg-[#D4AF37] hover:bg-[#E5C158] text-[#0F0F0F] font-body text-[13px] font-bold px-4 py-2 rounded-full shadow-md active:scale-95 transition-all"
               >
-                Clear All Filters
+                + Add Transaction
               </button>
-            )}
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="bg-[#262626] hover:bg-[#333333] text-[#E0E0E0] font-body text-[13px] font-bold px-4 py-2 rounded-full active:scale-95 transition-all"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           Object.entries(groupedTransactions).map(([dateGroup, items]) => {

@@ -5,9 +5,11 @@
  */
 
 import { Category, StatementImportSummary, Transaction } from '../types';
+import { CsvParser } from './csvParser';
 import { PdfParser } from './pdfParser';
 import { RuleEngineService } from './ruleEngine';
 import { RawSbiRow, SbiStatementParser } from './sbiStatementParser';
+import { KotakStatementParser } from './kotakStatementParser';
 import { TransactionService } from './transactionService';
 
 export class StatementService {
@@ -192,6 +194,40 @@ export class StatementService {
     accountId: string = 'acc-sbi',
     accountName: string = 'SBI Savings'
   ): Promise<StatementImportSummary> {
+    const isCsv = fileName.toLowerCase().endsWith('.csv');
+
+    if (isCsv) {
+      const csvText = fileBuffer
+        ? CsvParser.decodeBufferToString(fileBuffer)
+        : (fallbackText || '');
+      const csvResult = CsvParser.parseCsv(
+        csvText,
+        categories,
+        existingLedger,
+        accountId,
+        accountName
+      );
+
+      let autoCategorizedCount = 0;
+      let needsReviewCount = 0;
+      let duplicateCount = 0;
+
+      csvResult.transactions.forEach((tx) => {
+        if (tx.isDuplicate) duplicateCount++;
+        else if (tx.possibleDuplicate || tx.status === 'review') needsReviewCount++;
+        else autoCategorizedCount++;
+      });
+
+      return {
+        totalFound: csvResult.totalParsed,
+        autoCategorized: autoCategorizedCount,
+        needsReview: needsReviewCount,
+        duplicates: duplicateCount,
+        fileName,
+        transactions: csvResult.transactions,
+      };
+    }
+
     let lines: string[] = [];
 
     if (fileBuffer) {
@@ -199,6 +235,66 @@ export class StatementService {
       lines = pages.flatMap((p) => p.lines);
     } else if (fallbackText) {
       lines = fallbackText.split('\n');
+    }
+
+    // Check if Kotak Mahindra Bank statement
+    if (KotakStatementParser.isKotakStatement(lines) || fileName.toLowerCase().includes('kotak')) {
+      const actualLines = lines.length > 0 ? lines : fallbackText?.split('\n') || [];
+      const kotakResult = KotakStatementParser.parseLines(
+        actualLines,
+        categories,
+        accountId,
+        accountName
+      );
+
+      let autoCategorizedCount = 0;
+      let needsReviewCount = 0;
+      let duplicateCount = 0;
+
+      const processedTransactions: Transaction[] = kotakResult.transactions.map((tx) => {
+        // Automation rules evaluation
+        const ruleMatch = RuleEngineService.evaluateTransaction(tx, categories);
+        let assignedCategory: Category | undefined;
+        if (ruleMatch) {
+          assignedCategory = ruleMatch.category;
+          autoCategorizedCount++;
+        } else {
+          assignedCategory = categories.find((c) => c.id === tx.categoryId);
+          if (assignedCategory) {
+            autoCategorizedCount++;
+          }
+        }
+
+        // Duplicate check
+        const dupCheck = TransactionService.detectDuplicate(tx, existingLedger);
+        if (dupCheck.isDuplicate) duplicateCount++;
+        else if (dupCheck.possibleDuplicate) needsReviewCount++;
+
+        return {
+          ...tx,
+          categoryId: assignedCategory?.id || tx.categoryId,
+          categoryName: assignedCategory?.name || tx.categoryName,
+          categoryIcon: assignedCategory?.icon || tx.categoryIcon,
+          categoryColor: assignedCategory?.color || tx.categoryColor,
+          status: dupCheck.status,
+          isDuplicate: dupCheck.isDuplicate,
+          possibleDuplicate: dupCheck.possibleDuplicate,
+          matchReason: dupCheck.matchReason,
+        };
+      });
+
+      return {
+        totalFound: processedTransactions.length,
+        autoCategorized: autoCategorizedCount,
+        needsReview: needsReviewCount,
+        duplicates: duplicateCount,
+        fileName,
+        transactions: processedTransactions,
+        detectedBank: 'Kotak Mahindra Bank',
+        accountNumber: kotakResult.meta.accountNumber,
+        openingBalance: kotakResult.meta.openingBalance,
+        closingBalance: kotakResult.meta.closingBalance,
+      };
     }
 
     let parsedRows = this.parseStatementText(lines);

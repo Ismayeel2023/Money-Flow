@@ -1,10 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useFinance } from '../context/FinanceContext';
+import { CustomDropdown } from './CustomDropdown';
 
 export const NewBudgetModal: React.FC = () => {
   const { categories, addBudget, isNewBudgetModalOpen, setIsNewBudgetModalOpen } = useFinance();
 
-  const [categoryId, setCategoryId] = useState(categories[0]?.id || 'cat-dining');
+  // Filter to expense categories (or both)
+  const expenseCategories = useMemo(() => {
+    return categories.filter((c) => c.type === 'expense' || c.type === 'both');
+  }, [categories]);
+
+  const [categoryId, setCategoryId] = useState(
+    expenseCategories[0]?.id || categories[0]?.id || 'cat-dining'
+  );
   const [allocatedStr, setAllocatedStr] = useState('');
 
   if (!isNewBudgetModalOpen) return null;
@@ -14,7 +22,7 @@ export const NewBudgetModal: React.FC = () => {
     const allocated = parseFloat(allocatedStr);
     if (!allocated || isNaN(allocated) || allocated <= 0) return;
 
-    const cat = categories.find((c) => c.id === categoryId) || categories[0];
+    const cat = categories.find((c) => c.id === categoryId) || expenseCategories[0] || categories[0];
 
     addBudget({
       categoryId: cat.id,
@@ -31,11 +39,12 @@ export const NewBudgetModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
       <div className="bg-[#1A1A1A] rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-[#262626] relative flex flex-col gap-4">
         <button
+          type="button"
           onClick={() => setIsNewBudgetModalOpen(false)}
-          className="absolute top-5 right-5 w-8 h-8 rounded-full bg-[#262626] text-[#888888] flex items-center justify-center hover:bg-[#333333] hover:text-white"
+          className="absolute top-5 right-5 w-8 h-8 rounded-full bg-[#262626] text-[#888888] flex items-center justify-center hover:bg-[#333333] hover:text-white cursor-pointer transition-colors"
         >
           <span className="material-symbols-outlined text-[20px]">close</span>
         </button>
@@ -52,24 +61,24 @@ export const NewBudgetModal: React.FC = () => {
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3.5 mt-1">
           {/* Category */}
-          <div className="bg-[#262626] rounded-2xl p-3 flex flex-col gap-1 border border-[#383838] relative">
+          <div className="flex flex-col gap-1">
             <label className="font-body text-[10px] font-bold text-[#888888] uppercase tracking-wider">
               Category
             </label>
-            <select
+            <CustomDropdown
+              id="budget-category-dropdown"
               value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              className="bg-transparent font-body text-[14px] font-semibold text-[#FFFFFF] outline-none appearance-none pr-6 cursor-pointer"
-            >
-              {categories.map((c) => (
-                <option key={c.id} value={c.id} className="bg-[#1A1A1A] text-[#E0E0E0]">
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            <span className="material-symbols-outlined text-[#888888] text-[18px] pointer-events-none absolute right-3 bottom-3">
-              arrow_drop_down
-            </span>
+              onChange={(newCatId) => setCategoryId(newCatId)}
+              options={expenseCategories.map((c) => ({
+                id: c.id,
+                label: c.name,
+                icon: c.icon,
+                color: c.color,
+                sublabel: 'Expense',
+              }))}
+              placeholder="Select budget category"
+              className="w-full"
+            />
           </div>
 
           {/* Allocated Limit */}
@@ -92,13 +101,14 @@ export const NewBudgetModal: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsNewBudgetModalOpen(false)}
-              className="flex-1 bg-[#262626] hover:bg-[#333333] text-[#E0E0E0] border border-[#383838] font-body text-[14px] font-bold py-3.5 rounded-full"
+              className="flex-1 bg-[#262626] hover:bg-[#333333] text-[#E0E0E0] border border-[#383838] font-body text-[14px] font-bold py-3.5 rounded-full cursor-pointer transition-colors"
             >
               Cancel
             </button>
             <button
+              id="submit-budget-btn"
               type="submit"
-              className="flex-1 bg-[#D4AF37] hover:bg-[#E5C158] text-[#0F0F0F] font-display text-[14px] font-bold py-3.5 rounded-full shadow-[0_4px_16px_rgba(212,175,55,0.3)]"
+              className="flex-1 bg-[#D4AF37] hover:bg-[#E5C158] text-[#0F0F0F] font-display text-[14px] font-bold py-3.5 rounded-full shadow-[0_4px_16px_rgba(212,175,55,0.3)] cursor-pointer active:scale-98 transition-all"
             >
               Set Budget
             </button>

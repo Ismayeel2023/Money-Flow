@@ -93,6 +93,72 @@ export interface StatementImportSummary {
   duplicates: number;
   fileName: string;
   transactions: Transaction[];
+  detectedBank?: string;
+  accountNumber?: string;
+  openingBalance?: number;
+  closingBalance?: number;
+}
+
+export interface Subscription {
+  id: string;
+  name: string;
+  amount: number;
+  billingCycle: 'monthly' | 'yearly' | 'weekly';
+  categoryId: string;
+  categoryName: string;
+  categoryIcon: string;
+  categoryColor: string;
+  accountId: string;
+  accountName: string;
+  nextDueDate: string; // YYYY-MM-DD
+  isActive: boolean;
+  notes?: string;
+}
+
+export interface SavingsGoal {
+  id: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  targetDate?: string; // YYYY-MM-DD
+  icon: string;
+  color: string;
+  accountId?: string;
+  categoryName?: string;
+  isCompleted?: boolean;
+}
+
+export interface ParsedSmsResult {
+  amount: number;
+  type: 'expense' | 'income';
+  merchant: string;
+  accountNumber?: string;
+  bankName?: string;
+  upiReference?: string;
+  date: string;
+  time: string;
+  matchedAccountId?: string;
+  suggestedCategoryId?: string;
+  rawText: string;
+}
+
+export interface KotakStatementMeta {
+  accountHolder?: string;
+  accountNumber?: string;
+  ifsc?: string;
+  branch?: string;
+  statementPeriod?: string;
+  openingBalance?: number;
+  closingBalance?: number;
+}
+
+export interface SecuritySettings {
+  isLockEnabled: boolean;
+  pin: string;
+  biometricEnabled: boolean;
+  autoLockTimeout: 'immediate' | '1min' | '5min' | '15min' | 'never';
+  privacyScreen: boolean;
+  highValueAuth: boolean;
 }
 
 export type ScreenTab =
@@ -106,5 +172,11 @@ export type ScreenTab =
   | 'accounts'
   | 'import-statement'
   | 'import-review'
-  | 'reports';
+  | 'reports'
+  | 'category-spending'
+  | 'merchants'
+  | 'subscriptions'
+  | 'goals'
+  | 'sms-parser'
+  | 'export-backup';
 

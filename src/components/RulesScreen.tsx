@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useFinance } from '../context/FinanceContext';
 import { RuleEngineService } from '../services/ruleEngine';
 import { AutomationRule } from '../types';
+import { CustomDropdown } from './CustomDropdown';
 
 export const RulesScreen: React.FC = () => {
   const { categories, setTab } = useFinance();
@@ -198,17 +199,19 @@ export const RulesScreen: React.FC = () => {
                 <label className="font-body text-[11px] font-bold text-[#888888] uppercase">
                   Assign Category
                 </label>
-                <select
+                <CustomDropdown
+                  id="rule-assign-category"
                   value={selectedCatId}
-                  onChange={(e) => setSelectedCatId(e.target.value)}
-                  className="w-full bg-[#242424] text-[#FFFFFF] px-4 py-3 rounded-2xl border border-[#333333] focus:border-[#D4AF37] focus:outline-none font-body text-[14px]"
-                >
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.type})
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setSelectedCatId(val)}
+                  options={categories.map((c) => ({
+                    id: c.id,
+                    label: c.name,
+                    icon: c.icon,
+                    color: c.color,
+                    sublabel: c.type,
+                  }))}
+                  className="w-full"
+                />
               </div>
 
               <div className="flex flex-col gap-1.5">

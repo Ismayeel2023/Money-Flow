@@ -1,6 +1,7 @@
 import React from 'react';
 import confetti from 'canvas-confetti';
 import { useFinance } from '../context/FinanceContext';
+import { CustomDropdown } from './CustomDropdown';
 
 export const ImportReviewModal: React.FC = () => {
   const {
@@ -52,6 +53,15 @@ export const ImportReviewModal: React.FC = () => {
           const isReview = tx.status === 'review';
           const isSkipped = tx.status === 'skipped';
 
+          // Strictly filter categories based on transaction type
+          // Expense -> expense or both; Income -> income or both
+          const filteredCategories = categories.filter((c) => {
+            if (tx.type === 'income') {
+              return c.type === 'income' || c.type === 'both';
+            }
+            return c.type === 'expense' || c.type === 'both';
+          });
+
           return (
             <div
               key={tx.id}
@@ -67,16 +77,36 @@ export const ImportReviewModal: React.FC = () => {
             >
               {/* Header inside card */}
               <div className="flex justify-between items-start mb-2.5">
-                <div>
-                  <h4 className="font-body text-[16px] font-bold text-[#FFFFFF]">
-                    {tx.merchant}
-                  </h4>
-                  <p className="font-body text-[12px] text-[#888888]">
+                <div className="flex-1 pr-3">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                        tx.type === 'income'
+                          ? 'bg-[#10B981]/15 text-[#34D399]'
+                          : tx.type === 'refund'
+                          ? 'bg-[#38BDF8]/15 text-[#38BDF8]'
+                          : 'bg-[#FB7185]/15 text-[#FB7185]'
+                      }`}
+                    >
+                      {tx.type}
+                    </span>
+                    <h4 className="font-body text-[15px] font-bold text-[#FFFFFF] leading-snug break-words">
+                      {tx.merchant}
+                    </h4>
+                  </div>
+                  <p className="font-body text-[12px] text-[#888888] mt-1">
                     {tx.date} • {tx.accountName}
                   </p>
+                  {/* Preserved Full Raw Description */}
+                  {tx.rawDescription && tx.rawDescription !== tx.merchant && (
+                    <div className="mt-1.5 p-2 rounded-xl bg-[#141414] border border-[#262626] text-[11px] font-mono text-[#A0A0A0] break-words leading-relaxed select-text">
+                      <span className="text-[#888888] font-bold mr-1">RAW:</span>
+                      {tx.rawDescription}
+                    </div>
+                  )}
                 </div>
                 <span
-                  className={`font-display text-[16px] sm:text-[18px] font-bold ${
+                  className={`font-display text-[16px] sm:text-[18px] font-bold shrink-0 ${
                     tx.type === 'income' ? 'text-[#34D399]' : 'text-[#FFFFFF]'
                   }`}
                 >
@@ -110,24 +140,24 @@ export const ImportReviewModal: React.FC = () => {
 
               {/* Category Picker & Actions */}
               <div className="flex items-center gap-2 pt-1">
-                <div className="flex-1 relative">
-                  <select
+                <div className="flex-1 min-w-0">
+                  <CustomDropdown
+                    id={`import-cat-dropdown-${tx.id}`}
                     value={tx.categoryId}
-                    onChange={(e) =>
-                      updateImportTransactionCategory(tx.id, e.target.value)
+                    onChange={(newCatId) =>
+                      updateImportTransactionCategory(tx.id, newCatId)
                     }
                     disabled={isSkipped}
-                    className="w-full bg-[#262626] text-[#E0E0E0] border border-[#383838] font-body text-[13px] font-semibold py-2 px-3 pr-7 rounded-xl appearance-none outline-none focus:border-[#D4AF37]"
-                  >
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id} className="bg-[#1A1A1A] text-[#E0E0E0]">
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="material-symbols-outlined text-[#888888] text-[18px] pointer-events-none absolute right-2 top-1/2 -translate-y-1/2">
-                    arrow_drop_down
-                  </span>
+                    options={filteredCategories.map((c) => ({
+                      id: c.id,
+                      label: c.name,
+                      icon: c.icon,
+                      color: c.color,
+                      sublabel: c.type === 'both' ? 'Flexible' : `${c.type}`,
+                    }))}
+                    placeholder="Select category"
+                    className="w-full"
+                  />
                 </div>
 
                 {isSkipped ? (

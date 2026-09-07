@@ -23,11 +23,22 @@ import { TransferModal } from './components/TransferModal';
 import { NewBudgetModal } from './components/NewBudgetModal';
 import { TransactionDetailModal } from './components/TransactionDetailModal';
 import { UserProfileModal } from './components/UserProfileModal';
+import { SecurityModal } from './components/SecurityModal';
+import { AppSettingsModal } from './components/AppSettingsModal';
+import { LockScreen } from './components/LockScreen';
+import { MerchantsScreen } from './components/MerchantsScreen';
+import { CategorySpendingAnalysis } from './components/CategorySpendingAnalysis';
+import { SmsParserScreen } from './components/SmsParserScreen';
+import { SubscriptionsScreen } from './components/SubscriptionsScreen';
+import { SavingsGoalsScreen } from './components/SavingsGoalsScreen';
+import { ExportBackupScreen } from './components/ExportBackupScreen';
+import { EdgeSwipeBack } from './components/EdgeSwipeBack';
 
 const MainContent: React.FC = () => {
   const {
     tab,
     setTab,
+    goBack,
     activeTransactionForDetail,
     setActiveTransactionForDetail,
     isAddAccountModalOpen,
@@ -44,48 +55,13 @@ const MainContent: React.FC = () => {
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (activeTransactionForDetail) {
-          setActiveTransactionForDetail(null);
-          return;
-        }
-        if (isAddAccountModalOpen) {
-          setIsAddAccountModalOpen(false);
-          return;
-        }
-        if (isTransferModalOpen) {
-          setIsTransferModalOpen(false);
-          return;
-        }
-        if (isNewBudgetModalOpen) {
-          setIsNewBudgetModalOpen(false);
-          return;
-        }
-        if (isProfileModalOpen) {
-          setIsProfileModalOpen(false);
-          return;
-        }
-        if (tab !== 'dashboard' && tab !== 'activity' && tab !== 'budgets' && tab !== 'settings') {
-          setTab('dashboard');
-        }
+        goBack();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [
-    activeTransactionForDetail,
-    isAddAccountModalOpen,
-    isTransferModalOpen,
-    isNewBudgetModalOpen,
-    isProfileModalOpen,
-    tab,
-    setActiveTransactionForDetail,
-    setIsAddAccountModalOpen,
-    setIsTransferModalOpen,
-    setIsNewBudgetModalOpen,
-    setIsProfileModalOpen,
-    setTab,
-  ]);
+  }, [goBack]);
 
   const renderScreen = () => {
     switch (tab) {
@@ -111,6 +87,22 @@ const MainContent: React.FC = () => {
         return <ImportReviewModal />;
       case 'reports':
         return <ReportsScreen />;
+      case 'category-spending':
+        return (
+          <div className="flex flex-col w-full max-w-md mx-auto px-5 pt-2 pb-32">
+            <CategorySpendingAnalysis />
+          </div>
+        );
+      case 'merchants':
+        return <MerchantsScreen />;
+      case 'sms-parser':
+        return <SmsParserScreen />;
+      case 'subscriptions':
+        return <SubscriptionsScreen />;
+      case 'goals':
+        return <SavingsGoalsScreen />;
+      case 'export-backup':
+        return <ExportBackupScreen />;
       default:
         return <DashboardScreen />;
     }
@@ -118,47 +110,83 @@ const MainContent: React.FC = () => {
 
   const getHeaderProps = () => {
     switch (tab) {
+      case 'sms-parser':
+        return {
+          title: 'SMS & UPI Auto-Detect',
+          showBack: true,
+          onBack: () => goBack(),
+        };
+      case 'subscriptions':
+        return {
+          title: 'Subscriptions',
+          showBack: true,
+          onBack: () => goBack(),
+        };
+      case 'goals':
+        return {
+          title: 'Savings Goals',
+          showBack: true,
+          onBack: () => goBack(),
+        };
+      case 'export-backup':
+        return {
+          title: 'Export & Backup',
+          showBack: true,
+          onBack: () => goBack(),
+        };
+      case 'merchants':
+        return {
+          title: 'People & Merchants',
+          showBack: true,
+          onBack: () => goBack(),
+        };
+      case 'category-spending':
+        return {
+          title: 'Category Spending',
+          showBack: true,
+          onBack: () => goBack(),
+        };
       case 'add-transaction':
         return {
           title: 'Add Transaction',
           showBack: true,
-          onBack: () => setTab('dashboard'),
+          onBack: () => goBack(),
         };
       case 'import-review':
         return {
           title: 'Review Transactions',
           showBack: true,
-          onBack: () => setTab('import-statement'),
+          onBack: () => goBack(),
         };
       case 'categories':
         return {
           title: 'Categories',
           showBack: true,
-          onBack: () => setTab('settings'),
+          onBack: () => goBack(),
         };
       case 'rules':
         return {
           title: 'Automation Rules',
           showBack: true,
-          onBack: () => setTab('settings'),
+          onBack: () => goBack(),
         };
       case 'reports':
         return {
           title: 'Reports & Analytics',
           showBack: true,
-          onBack: () => setTab('settings'),
+          onBack: () => goBack(),
         };
       case 'accounts':
         return {
           title: 'Accounts',
           showBack: true,
-          onBack: () => setTab('settings'),
+          onBack: () => goBack(),
         };
       case 'import-statement':
         return {
           title: 'Import Statement',
           showBack: true,
-          onBack: () => setTab('settings'),
+          onBack: () => goBack(),
         };
       default:
         return {
@@ -185,11 +213,15 @@ const MainContent: React.FC = () => {
       {!hideBottomNav && <BottomNavigation />}
 
       {/* Global Modals */}
+      <EdgeSwipeBack />
       <AddAccountModal />
       <TransferModal />
       <NewBudgetModal />
       <TransactionDetailModal />
       <UserProfileModal />
+      <SecurityModal />
+      <AppSettingsModal />
+      <LockScreen />
     </div>
   );
 };

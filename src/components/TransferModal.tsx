@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useFinance } from '../context/FinanceContext';
+import { CustomDropdown } from './CustomDropdown';
 
 export const TransferModal: React.FC = () => {
   const { accounts, transferMoney, isTransferModalOpen, setIsTransferModalOpen } = useFinance();
@@ -24,12 +25,13 @@ export const TransferModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
       <div className="bg-[#1A1A1A] rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-[#262626] relative flex flex-col gap-4">
         {/* Close button */}
         <button
+          type="button"
           onClick={() => setIsTransferModalOpen(false)}
-          className="absolute top-5 right-5 w-8 h-8 rounded-full bg-[#262626] text-[#888888] flex items-center justify-center hover:bg-[#333333] hover:text-white"
+          className="absolute top-5 right-5 w-8 h-8 rounded-full bg-[#262626] text-[#888888] flex items-center justify-center hover:bg-[#333333] hover:text-white cursor-pointer transition-colors"
         >
           <span className="material-symbols-outlined text-[20px]">close</span>
         </button>
@@ -62,45 +64,45 @@ export const TransferModal: React.FC = () => {
           </div>
 
           {/* From Account */}
-          <div className="bg-[#262626] rounded-2xl p-3 flex flex-col gap-1 border border-[#383838] relative">
+          <div className="flex flex-col gap-1">
             <label className="font-body text-[10px] font-bold text-[#888888] uppercase tracking-wider">
               From Account
             </label>
-            <select
+            <CustomDropdown
+              id="transfer-from-account"
               value={fromAccount}
-              onChange={(e) => setFromAccount(e.target.value)}
-              className="bg-transparent font-body text-[14px] font-semibold text-[#FFFFFF] outline-none appearance-none pr-6 cursor-pointer"
-            >
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id} className="bg-[#1A1A1A] text-[#E0E0E0]">
-                  {a.name} (₹{new Intl.NumberFormat('en-IN').format(a.balance)})
-                </option>
-              ))}
-            </select>
-            <span className="material-symbols-outlined text-[#888888] text-[18px] pointer-events-none absolute right-3 bottom-3">
-              arrow_drop_down
-            </span>
+              onChange={(val) => setFromAccount(val)}
+              options={accounts.map((a) => ({
+                id: a.id,
+                label: a.name,
+                icon: a.icon || (a.type === 'cash' ? 'payments' : 'account_balance'),
+                color: a.color || '#3525cd',
+                sublabel: `₹${new Intl.NumberFormat('en-IN').format(a.balance)}`,
+              }))}
+              className="w-full"
+            />
           </div>
 
           {/* To Account */}
-          <div className="bg-[#262626] rounded-2xl p-3 flex flex-col gap-1 border border-[#383838] relative">
+          <div className="flex flex-col gap-1">
             <label className="font-body text-[10px] font-bold text-[#888888] uppercase tracking-wider">
               To Account
             </label>
-            <select
+            <CustomDropdown
+              id="transfer-to-account"
               value={toAccount}
-              onChange={(e) => setToAccount(e.target.value)}
-              className="bg-transparent font-body text-[14px] font-semibold text-[#FFFFFF] outline-none appearance-none pr-6 cursor-pointer"
-            >
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id} disabled={a.id === fromAccount} className="bg-[#1A1A1A] text-[#E0E0E0]">
-                  {a.name} (₹{new Intl.NumberFormat('en-IN').format(a.balance)})
-                </option>
-              ))}
-            </select>
-            <span className="material-symbols-outlined text-[#888888] text-[18px] pointer-events-none absolute right-3 bottom-3">
-              arrow_drop_down
-            </span>
+              onChange={(val) => setToAccount(val)}
+              options={accounts
+                .filter((a) => a.id !== fromAccount)
+                .map((a) => ({
+                  id: a.id,
+                  label: a.name,
+                  icon: a.icon || (a.type === 'cash' ? 'payments' : 'account_balance'),
+                  color: a.color || '#006c49',
+                  sublabel: `₹${new Intl.NumberFormat('en-IN').format(a.balance)}`,
+                }))}
+              className="w-full"
+            />
           </div>
 
           {/* Notes */}

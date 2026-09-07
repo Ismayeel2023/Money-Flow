@@ -1,5 +1,6 @@
 import React from 'react';
 import { useFinance } from '../context/FinanceContext';
+import { CategorySpendingAnalysis } from './CategorySpendingAnalysis';
 
 export const ReportsScreen: React.FC = () => {
   const {
@@ -8,7 +9,7 @@ export const ReportsScreen: React.FC = () => {
     netFlow,
     topSpendings,
     formatCurrency,
-    setTab,
+    goBack,
   } = useFinance();
 
   const totalSpent = topSpendings.reduce((sum, item) => sum + item.amount, 0) || 1;
@@ -100,12 +101,17 @@ export const ReportsScreen: React.FC = () => {
         </div>
       </section>
 
+      {/* Category Spending Analysis Tool */}
+      <section className="mt-2">
+        <CategorySpendingAnalysis />
+      </section>
+
       <button
         type="button"
-        onClick={() => setTab('settings')}
+        onClick={() => goBack()}
         className="w-full bg-[#262626] hover:bg-[#333333] text-[#E0E0E0] border border-[#383838] font-body text-[14px] font-bold py-4 rounded-full transition-colors"
       >
-        Back to Settings
+        Back
       </button>
     </div>
   );
