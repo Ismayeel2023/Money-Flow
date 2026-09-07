@@ -1,16 +1,42 @@
 import React from 'react';
 import { useFinance } from '../context/FinanceContext';
+import { CustomDropdown } from './CustomDropdown';
 
 export const ImportStatementScreen: React.FC = () => {
-  const { importSummary, setTab, goBack, processStatementUpload, processKotakDemoStatement, formatCurrency } = useFinance();
+  const {
+    accounts,
+    importSummary,
+    setTab,
+    goBack,
+    processStatementUpload,
+    processKotakDemoStatement,
+    formatCurrency,
+  } = useFinance();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const defaultAccountId =
+    accounts.find((a) => a.isDefault)?.id || accounts.find((a) => a.type === 'bank')?.id || accounts[0]?.id || '';
+  const [selectedAccountId, setSelectedAccountId] = React.useState<string>(defaultAccountId);
+
+  React.useEffect(() => {
+    if (!selectedAccountId && defaultAccountId) {
+      setSelectedAccountId(defaultAccountId);
+    }
+  }, [defaultAccountId, selectedAccountId]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      processStatementUpload(file);
+      processStatementUpload(file, undefined, selectedAccountId);
     }
+    e.target.value = '';
   };
+
+  const matchLabel =
+    importSummary.accountMatchSource === 'account-number'
+      ? 'Matched by account number'
+      : importSummary.accountMatchSource === 'bank-name'
+        ? 'Matched by bank name'
+        : 'Using the account you selected';
 
   return (
     <div className="flex flex-col w-full max-w-md mx-auto px-5 pt-4 sm:pt-5 pb-32 gap-6">
@@ -42,6 +68,17 @@ export const ImportStatementScreen: React.FC = () => {
           </p>
 
           {/* Detected Bank Banner */}
+          {importSummary.totalFound > 0 && importSummary.matchedAccountName && (
+            <div className="mt-2 px-4 py-2 rounded-2xl bg-[#10B981]/10 border border-[#10B981]/30 flex items-center gap-2 text-left w-full max-w-[340px]">
+              <span className="material-symbols-outlined text-[#34D399] text-[20px]">account_balance_wallet</span>
+              <div>
+                <span className="text-[13px] font-bold text-[#FFFFFF] block">
+                  {importSummary.matchedAccountName}
+                </span>
+                <span className="text-[11px] text-[#A0A0A0]">{matchLabel}</span>
+              </div>
+            </div>
+          )}
           {importSummary.totalFound > 0 && importSummary.detectedBank && (
             <div className="mt-3 px-4 py-2 rounded-2xl bg-[#D4AF37]/10 border border-[#D4AF37]/30 flex items-center gap-2 text-left">
               <span className="material-symbols-outlined text-[#D4AF37] text-[20px]">account_balance</span>
@@ -62,6 +99,26 @@ export const ImportStatementScreen: React.FC = () => {
 
       {importSummary.totalFound === 0 ? (
         <div className="flex flex-col gap-4">
+          <div className="bg-[#1A1A1A] rounded-2xl p-4 border border-[#262626] flex flex-col gap-2">
+            <CustomDropdown
+              id="import-target-account"
+              label="Import into account"
+              options={accounts.map((a) => ({
+                id: a.id,
+                label: a.name,
+                icon: a.type === 'credit' ? 'credit_card' : a.type === 'cash' ? 'payments' : 'account_balance',
+                sublabel: a.accountNumber ? `A/C ••••${a.accountNumber.slice(-4)}` : a.type.toUpperCase(),
+                color: a.color || '#D4AF37',
+              }))}
+              value={selectedAccountId}
+              onChange={setSelectedAccountId}
+              searchable={accounts.length > 4}
+            />
+            <p className="font-body text-[12px] text-[#888888] leading-relaxed">
+              Select the account this statement belongs to. If the PDF/CSV includes an account number that matches one of yours, that account is used instead.
+            </p>
+          </div>
+
           <button
             onClick={() => fileInputRef.current?.click()}
             className="w-full bg-[#D4AF37] hover:bg-[#E5C158] text-[#0F0F0F] rounded-full py-4 font-body text-[16px] font-bold shadow-[0_8px_24px_rgba(212,175,55,0.25)] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
@@ -80,7 +137,7 @@ export const ImportStatementScreen: React.FC = () => {
           {/* 1-Click Demo Statements */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <button
-              onClick={() => processKotakDemoStatement()}
+              onClick={() => processKotakDemoStatement(selectedAccountId)}
               className="bg-[#1A1A1A] hover:bg-[#242424] border border-[#ED1C24]/30 hover:border-[#ED1C24] p-3.5 rounded-2xl text-left flex items-center gap-3 transition-all active:scale-[0.98]"
             >
               <div className="w-10 h-10 rounded-xl bg-[#ED1C24]/15 text-[#ED1C24] flex items-center justify-center shrink-0">
@@ -97,7 +154,7 @@ export const ImportStatementScreen: React.FC = () => {
             </button>
 
             <button
-              onClick={() => processStatementUpload(null)}
+              onClick={() => processStatementUpload(null, undefined, selectedAccountId)}
               className="bg-[#1A1A1A] hover:bg-[#242424] border border-[#3525cd]/30 hover:border-[#3525cd] p-3.5 rounded-2xl text-left flex items-center gap-3 transition-all active:scale-[0.98]"
             >
               <div className="w-10 h-10 rounded-xl bg-[#3525cd]/15 text-[#6366f1] flex items-center justify-center shrink-0">

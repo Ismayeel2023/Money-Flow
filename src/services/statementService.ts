@@ -4,7 +4,7 @@
  * detects duplicates, and builds import summaries.
  */
 
-import { Category, StatementImportSummary, Transaction } from '../types';
+import { Account, Category, StatementImportSummary, Transaction } from '../types';
 import { CsvParser } from './csvParser';
 import { PdfParser } from './pdfParser';
 import { RuleEngineService } from './ruleEngine';
@@ -13,6 +13,76 @@ import { KotakStatementParser } from './kotakStatementParser';
 import { TransactionService } from './transactionService';
 
 export class StatementService {
+  public static extractAccountNumberFromText(text: string): string | undefined {
+    const patterns = [
+      /Account\s*(?:No\.?|Number|#)\s*[:.\-]?\s*[Xx\*]*\s*([0-9]{4,18})/i,
+      /A\/?c(?:count)?\s*(?:No\.?)?\s*[:.\-]?\s*[Xx\*]*\s*([0-9]{4,18})/i,
+    ];
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match?.[1]) return match[1];
+    }
+    return undefined;
+  }
+
+  public static detectBankName(text: string, fileName = ''): string | undefined {
+    const hay = `${fileName}\n${text}`.toLowerCase();
+    if (hay.includes('kotak')) return 'Kotak Mahindra Bank';
+    if (hay.includes('state bank') || /\bsbi\b/.test(hay)) return 'State Bank of India';
+    if (hay.includes('hdfc')) return 'HDFC Bank';
+    if (hay.includes('icici')) return 'ICICI Bank';
+    return undefined;
+  }
+
+  public static accountNumbersMatch(statementNumber: string, savedNumber: string): boolean {
+    const a = statementNumber.replace(/\D/g, '');
+    const b = savedNumber.replace(/\D/g, '');
+    if (a.length < 4 || b.length < 4) return false;
+    return a.endsWith(b) || b.endsWith(a);
+  }
+
+  public static resolveImportAccount(
+    accounts: Account[],
+    selectedAccountId: string | undefined,
+    accountNumber?: string,
+    bankName?: string
+  ): { account: Account; source: 'account-number' | 'bank-name' | 'selected' } {
+    const fallback: Account =
+      accounts.find((a) => a.id === selectedAccountId) ||
+      accounts.find((a) => a.isDefault) ||
+      accounts[0] || {
+        id: 'acc-primary',
+        name: 'Main Bank Account',
+        type: 'bank',
+        balance: 0,
+        icon: 'account_balance',
+      };
+
+    if (accountNumber) {
+      const byNumber = accounts.find(
+        (a) => a.accountNumber && this.accountNumbersMatch(accountNumber, a.accountNumber)
+      );
+      if (byNumber) return { account: byNumber, source: 'account-number' };
+    }
+
+    if (bankName) {
+      const lower = bankName.toLowerCase();
+      const needles = lower.includes('kotak')
+        ? ['kotak']
+        : lower.includes('state bank') || lower.includes('sbi')
+          ? ['sbi', 'state bank']
+          : lower.includes('hdfc')
+            ? ['hdfc']
+            : lower.includes('icici')
+              ? ['icici']
+              : [lower.split(' ')[0]];
+      const byBank = accounts.find((a) => needles.some((n) => a.name.toLowerCase().includes(n)));
+      if (byBank) return { account: byBank, source: 'bank-name' };
+    }
+
+    return { account: fallback, source: 'selected' };
+  }
+
   /**
    * Parses raw statement text / lines into structured RawSbiRow items.
    * Accurately stitches multi-line wrapped transaction rows, parses debit/credit,
@@ -191,8 +261,8 @@ export class StatementService {
     fallbackText?: string,
     categories: Category[] = [],
     existingLedger: Transaction[] = [],
-    accountId: string = 'acc-sbi',
-    accountName: string = 'SBI Savings'
+    accounts: Account[] = [],
+    selectedAccountId?: string
   ): Promise<StatementImportSummary> {
     const isCsv = fileName.toLowerCase().endsWith('.csv');
 
@@ -200,12 +270,20 @@ export class StatementService {
       const csvText = fileBuffer
         ? CsvParser.decodeBufferToString(fileBuffer)
         : (fallbackText || '');
+      const csvAccountNumber = this.extractAccountNumberFromText(csvText);
+      const csvBank = this.detectBankName(csvText, fileName);
+      const csvTarget = this.resolveImportAccount(
+        accounts,
+        selectedAccountId,
+        csvAccountNumber,
+        csvBank
+      );
       const csvResult = CsvParser.parseCsv(
         csvText,
         categories,
         existingLedger,
-        accountId,
-        accountName
+        csvTarget.account.id,
+        csvTarget.account.name
       );
 
       let autoCategorizedCount = 0;
@@ -225,6 +303,11 @@ export class StatementService {
         duplicates: duplicateCount,
         fileName,
         transactions: csvResult.transactions,
+        detectedBank: csvBank,
+        accountNumber: csvAccountNumber,
+        matchedAccountId: csvTarget.account.id,
+        matchedAccountName: csvTarget.account.name,
+        accountMatchSource: csvTarget.source,
       };
     }
 
@@ -237,14 +320,23 @@ export class StatementService {
       lines = fallbackText.split('\n');
     }
 
+    const joinedText = lines.join('\n');
+
     // Check if Kotak Mahindra Bank statement
     if (KotakStatementParser.isKotakStatement(lines) || fileName.toLowerCase().includes('kotak')) {
       const actualLines = lines.length > 0 ? lines : fallbackText?.split('\n') || [];
+      const kotakMeta = KotakStatementParser.extractMetadata(actualLines);
+      const kotakTarget = this.resolveImportAccount(
+        accounts,
+        selectedAccountId,
+        kotakMeta.accountNumber,
+        'Kotak Mahindra Bank'
+      );
       const kotakResult = KotakStatementParser.parseLines(
         actualLines,
         categories,
-        accountId,
-        accountName
+        kotakTarget.account.id,
+        kotakTarget.account.name
       );
 
       let autoCategorizedCount = 0;
@@ -294,8 +386,20 @@ export class StatementService {
         accountNumber: kotakResult.meta.accountNumber,
         openingBalance: kotakResult.meta.openingBalance,
         closingBalance: kotakResult.meta.closingBalance,
+        matchedAccountId: kotakTarget.account.id,
+        matchedAccountName: kotakTarget.account.name,
+        accountMatchSource: kotakTarget.source,
       };
     }
+
+    const sbiAccountNumber = this.extractAccountNumberFromText(joinedText);
+    const sbiBank = this.detectBankName(joinedText, fileName) || 'State Bank of India';
+    const sbiTarget = this.resolveImportAccount(
+      accounts,
+      selectedAccountId,
+      sbiAccountNumber,
+      sbiBank
+    );
 
     let parsedRows = this.parseStatementText(lines);
 
@@ -330,7 +434,11 @@ export class StatementService {
       ];
     }
 
-    const rawTransactions = SbiStatementParser.parseRows(parsedRows, accountId, accountName);
+    const rawTransactions = SbiStatementParser.parseRows(
+      parsedRows,
+      sbiTarget.account.id,
+      sbiTarget.account.name
+    );
 
     let autoCategorizedCount = 0;
     let needsReviewCount = 0;
@@ -398,6 +506,11 @@ export class StatementService {
       duplicates: duplicateCount,
       fileName,
       transactions: processedTransactions,
+      detectedBank: sbiBank,
+      accountNumber: sbiAccountNumber,
+      matchedAccountId: sbiTarget.account.id,
+      matchedAccountName: sbiTarget.account.name,
+      accountMatchSource: sbiTarget.source,
     };
   }
 }

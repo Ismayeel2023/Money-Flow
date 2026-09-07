@@ -97,6 +97,9 @@ export interface StatementImportSummary {
   accountNumber?: string;
   openingBalance?: number;
   closingBalance?: number;
+  matchedAccountId?: string;
+  matchedAccountName?: string;
+  accountMatchSource?: 'account-number' | 'bank-name' | 'selected';
 }
 
 export interface Subscription {

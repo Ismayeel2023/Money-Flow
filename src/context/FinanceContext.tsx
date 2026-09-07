@@ -57,8 +57,12 @@ interface FinanceContextType {
   updateBudget: (id: string, updates: Partial<Budget>) => void;
   deleteBudget: (id: string) => void;
   importSummary: StatementImportSummary;
-  processStatementUpload: (file?: File | null, sampleType?: string) => Promise<void>;
-  processKotakDemoStatement: () => Promise<void>;
+  processStatementUpload: (
+    file?: File | null,
+    sampleType?: string,
+    selectedAccountId?: string
+  ) => Promise<void>;
+  processKotakDemoStatement: (selectedAccountId?: string) => Promise<void>;
   acceptImportTransaction: (id: string) => void;
   rejectImportTransaction: (id: string) => void;
   updateImportTransactionCategory: (id: string, categoryId: string) => void;
@@ -769,7 +773,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Statement Processing
   const importSummary = importSummaryState;
 
-  const processStatementUpload = async (file?: File | null, sampleType?: string) => {
+  const processStatementUpload = async (
+    file?: File | null,
+    sampleType?: string,
+    selectedAccountId?: string
+  ) => {
+    const fallbackAccountId = selectedAccountId || accounts.find((a) => a.isDefault)?.id || accounts[0]?.id;
+
     let summary: StatementImportSummary;
     if (file) {
       const buffer = await file.arrayBuffer();
@@ -779,8 +789,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         undefined,
         categories,
         transactions,
-        accounts[0]?.id || 'acc-sbi',
-        accounts[0]?.name || 'SBI Savings'
+        accounts,
+        fallbackAccountId
       );
     } else if (sampleType === 'kotak') {
       summary = await StatementService.processStatementFile(
@@ -789,52 +799,37 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         KOTAK_SAMPLE_STATEMENT_TEXT,
         categories,
         transactions,
-        'acc-kotak-6402',
-        'Kotak Savings (6402)'
+        accounts,
+        fallbackAccountId
       );
     } else {
-      // Demo / fallback statement processing (SBI)
       summary = await StatementService.processStatementFile(
         'SBI_Account_Statement.pdf',
         undefined,
         undefined,
         categories,
         transactions,
-        accounts[0]?.id || 'acc-sbi',
-        accounts[0]?.name || 'SBI Savings'
+        accounts,
+        fallbackAccountId
       );
     }
 
-    // Auto-create Kotak account if statement is from Kotak Mahindra Bank
-    if (summary.detectedBank === 'Kotak Mahindra Bank') {
-      setAccounts((prev) => {
-        const exists = prev.some(
-          (a) => a.id === 'acc-kotak-6402' || a.accountNumber === '6402' || a.name.toLowerCase().includes('kotak')
-        );
-        if (!exists) {
-          return [
-            ...prev,
-            {
-              id: 'acc-kotak-6402',
-              name: 'Kotak Savings',
-              type: 'bank',
-              accountNumber: summary.accountNumber || '6402',
-              balance: summary.closingBalance ?? 2647.71,
-              icon: 'account_balance',
-              color: '#ED1C24',
-            },
-          ];
-        }
-        return prev;
-      });
+    if (summary.matchedAccountId && summary.accountNumber) {
+      setAccounts((prev) =>
+        prev.map((a) => {
+          if (a.id !== summary.matchedAccountId || a.accountNumber) return a;
+          const digits = summary.accountNumber!.replace(/\D/g, '');
+          return { ...a, accountNumber: digits.slice(-4) };
+        })
+      );
     }
 
     setImportSummaryState(summary);
     setTab('import-statement');
   };
 
-  const processKotakDemoStatement = async () => {
-    await processStatementUpload(null, 'kotak');
+  const processKotakDemoStatement = async (selectedAccountId?: string) => {
+    await processStatementUpload(null, 'kotak', selectedAccountId);
   };
 
   // Subscriptions & Recurring Expenses State
