@@ -20,22 +20,24 @@ export const TransactionDetailModal: React.FC = () => {
   const [rememberDecision, setRememberDecision] = useState(true);
   const [copiedUpi, setCopiedUpi] = useState(false);
 
-  if (!activeTransactionForDetail) return null;
-
   const tx = activeTransactionForDetail;
-  const isIncome = tx.type === 'income';
-  const isRefund = tx.type === 'refund';
-  const isDuplicate = tx.status === 'duplicate' || tx.isDuplicate;
-  const isPossibleDuplicate = tx.possibleDuplicate;
-  const isReview = tx.status === 'review';
 
   const eligibleCategories = useMemo(() => {
+    if (!tx) return [];
     return categories.filter((c) =>
       tx.type === 'income'
         ? c.type === 'income' || c.type === 'both'
         : c.type === 'expense' || c.type === 'both'
     );
-  }, [categories, tx.type]);
+  }, [categories, tx]);
+
+  if (!tx) return null;
+
+  const isIncome = tx.type === 'income';
+  const isRefund = tx.type === 'refund';
+  const isDuplicate = tx.status === 'duplicate' || tx.isDuplicate;
+  const isPossibleDuplicate = tx.possibleDuplicate;
+  const isReview = tx.status === 'review';
 
   const handleStartEdit = () => {
     setMerchant(tx.merchant);
@@ -102,8 +104,17 @@ export const TransactionDetailModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-[#1A1A1A] rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-[#262626] relative flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn"
+      onClick={() => {
+        setActiveTransactionForDetail(null);
+        setIsEditing(false);
+      }}
+    >
+      <div
+        className="bg-[#1A1A1A] rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-[#262626] relative flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Close Button */}
         <button
           onClick={() => {
