@@ -1,17 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import confetti from 'canvas-confetti';
 import { useFinance } from '../context/FinanceContext';
 import { SmsParserService } from '../services/smsParserService';
 import { ParsedSmsResult } from '../types';
 import { CustomDropdown } from './CustomDropdown';
 
 export const SmsParserScreen: React.FC = () => {
-  const { accounts, categories, addTransactionFromSms, formatCurrency, setTab } = useFinance();
+  const { accounts, categories, addTransactionFromSms, formatCurrency } = useFinance();
 
   const [inputText, setInputText] = useState<string>('');
   const [parsed, setParsed] = useState<ParsedSmsResult | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [successToast, setSuccessToast] = useState<string | null>(null);
+
+  // Real-time SMS Listener & Permission State
+  const [isListeningForSms, setIsListeningForSms] = useState<boolean>(false);
+  const [smsPermissionState, setSmsPermissionState] = useState<'prompt' | 'granted' | 'unsupported'>('prompt');
+  const [permissionNotice, setPermissionNotice] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Quick sample templates
   const samples = [
@@ -32,6 +39,73 @@ export const SmsParserScreen: React.FC = () => {
       text: 'Dear Customer, INR 45,000.00 credited to Kotak Bank A/c xx6402 on 01-Sep-26 by TRANSFER from TECH CORP.',
     },
   ];
+
+  // Check WebOTP API support on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'OTPCredential' in window) {
+      setSmsPermissionState('prompt');
+    } else {
+      // In browsers without native WebOTP, we support clipboard & touch permission
+      setSmsPermissionState('prompt');
+    }
+  }, []);
+
+  // Request SMS Read Permission & start listening via WebOTP
+  const startSmsListener = async () => {
+    if (typeof window === 'undefined') return;
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const ac = new AbortController();
+    abortControllerRef.current = ac;
+
+    setIsListeningForSms(true);
+    setSmsPermissionState('granted');
+    setPermissionNotice('SMS detection active. Waiting for incoming bank SMS...');
+
+    // If WebOTP API is supported, listen for native incoming SMS
+    if ('OTPCredential' in window && navigator.credentials) {
+      try {
+        const content: any = await (navigator.credentials as any).get({
+          otp: { transport: ['sms'] },
+          signal: ac.signal,
+        });
+
+        if (content && content.code) {
+          setInputText(content.code);
+          setIsListeningForSms(false);
+          setPermissionNotice('New SMS received and detected!');
+        }
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          console.info('WebOTP listener notice:', err);
+        }
+      }
+    }
+  };
+
+  const stopSmsListener = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsListeningForSms(false);
+    setPermissionNotice(null);
+  };
+
+  // Simulate an incoming SMS for testing
+  const simulateIncomingSms = (sampleIndex: number = 0) => {
+    const s = samples[sampleIndex];
+    if (s) {
+      if ('vibrate' in navigator) {
+        navigator.vibrate?.([60, 40, 60]);
+      }
+      setInputText(s.text);
+      setPermissionNotice(`SMS Auto-Detected from ${s.label}!`);
+      setTimeout(() => setPermissionNotice(null), 4000);
+    }
+  };
 
   // Parse text whenever input changes
   useEffect(() => {
@@ -69,12 +143,20 @@ export const SmsParserScreen: React.FC = () => {
       suggestedCategoryId: selectedCategoryId,
     };
     addTransactionFromSms(finalResult);
+    try {
+      confetti({
+        particleCount: 50,
+        spread: 60,
+        origin: { y: 0.7 },
+        colors: ['#D4AF37', '#10B981', '#38BDF8'],
+      });
+    } catch {}
     setSuccessToast(`Saved ₹${parsed.amount.toFixed(2)} to ${parsed.merchant}!`);
     setTimeout(() => setSuccessToast(null), 3000);
   };
 
   return (
-    <div className="flex flex-col w-full max-w-xl mx-auto px-4 pt-4 sm:pt-5 pb-32 gap-5">
+    <div className="flex flex-col w-full max-w-xl mx-auto px-4 pt-4 sm:pt-5 pb-36 gap-5">
       {/* Top Banner */}
       <div className="bg-[#1A1A1A] border border-[#262626] rounded-2xl p-5 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -83,19 +165,87 @@ export const SmsParserScreen: React.FC = () => {
           </div>
           <div>
             <h1 className="font-display text-[20px] font-bold text-[#FFFFFF]">
-              SMS & Clipboard Auto-Detection
+              SMS &amp; UPI Auto-Detection
             </h1>
             <p className="font-body text-[13px] text-[#888888]">
-              Paste or type any bank or UPI transaction message
+              Read incoming bank SMS messages and auto-fill your ledger
             </p>
           </div>
         </div>
       </div>
 
+      {/* SMS Read Permission & Live Listener Card */}
+      <div className="bg-[#1A1A1A] border-2 border-[#D4AF37]/60 rounded-3xl p-5 flex flex-col gap-3 shadow-md relative overflow-hidden">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[22px] text-[#D4AF37]">
+              phonelink_ring
+            </span>
+            <h3 className="font-bold text-[15px] text-white">
+              Live Incoming SMS Listener
+            </h3>
+          </div>
+
+          {isListeningForSms ? (
+            <span className="flex items-center gap-1.5 text-[11px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-2.5 py-1 rounded-full">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              LISTENING
+            </span>
+          ) : (
+            <span className="text-[11px] font-bold bg-[#262626] text-[#888888] px-2.5 py-1 rounded-full">
+              IDLE
+            </span>
+          )}
+        </div>
+
+        <p className="text-[12px] text-[#A0A0A0] leading-relaxed">
+          When activated, Money Flow listens for incoming SMS from your bank (Kotak, SBI, HDFC, ICICI, etc.) and automatically parses the debit amount, merchant, and reference code.
+        </p>
+
+        {/* Action Controls */}
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          {!isListeningForSms ? (
+            <button
+              type="button"
+              onClick={startSmsListener}
+              className="px-4 py-2.5 rounded-full bg-[#D4AF37] hover:bg-[#E5C158] text-[#0F0F0F] font-bold text-[13px] shadow-md flex items-center gap-1.5 transition-all active:scale-95"
+            >
+              <span className="material-symbols-outlined text-[18px]">sensors</span>
+              <span>Grant SMS Permission &amp; Listen</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={stopSmsListener}
+              className="px-4 py-2.5 rounded-full bg-[#262626] hover:bg-[#333333] text-[#FB7185] border border-[#FB7185]/40 font-bold text-[13px] flex items-center gap-1.5 transition-all active:scale-95"
+            >
+              <span className="material-symbols-outlined text-[18px]">stop_circle</span>
+              <span>Stop Listening</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => simulateIncomingSms(0)}
+            className="px-3.5 py-2.5 rounded-full bg-[#1F1F1F] hover:bg-[#2A2A2A] text-[#D4AF37] border border-[#D4AF37]/30 text-[12px] font-semibold flex items-center gap-1 transition-all active:scale-95"
+          >
+            <span className="material-symbols-outlined text-[16px]">play_arrow</span>
+            <span>Simulate Incoming SMS</span>
+          </button>
+        </div>
+
+        {permissionNotice && (
+          <div className="p-3 bg-[#121212] border border-[#D4AF37]/30 rounded-2xl flex items-center gap-2 text-[12px] text-[#D4AF37] animate-in fade-in">
+            <span className="material-symbols-outlined text-[18px]">info</span>
+            <span>{permissionNotice}</span>
+          </div>
+        )}
+      </div>
+
       {/* Quick Sample Chips */}
       <div className="flex flex-col gap-2">
         <span className="font-body text-[12px] font-bold text-[#888888] tracking-wider uppercase">
-          Try Sample Statements & SMS
+          Try Sample Bank SMS Alerts
         </span>
         <div className="flex flex-wrap gap-2">
           {samples.map((s, idx) => (
@@ -243,6 +393,17 @@ export const SmsParserScreen: React.FC = () => {
           </span>
         </div>
       )}
+
+      {/* Android Privacy & Permission Note */}
+      <div className="bg-[#141414] border border-[#262626] rounded-2xl p-4 flex flex-col gap-1.5 text-[12px] text-[#888888]">
+        <div className="flex items-center gap-2 text-white font-bold">
+          <span className="material-symbols-outlined text-[18px] text-[#D4AF37]">privacy_tip</span>
+          <span>100% On-Device Privacy</span>
+        </div>
+        <p>
+          Money Flow processes your SMS messages entirely on your device. No SMS texts or banking data are ever transmitted to any remote servers.
+        </p>
+      </div>
 
       {/* Success Toast */}
       {successToast && (

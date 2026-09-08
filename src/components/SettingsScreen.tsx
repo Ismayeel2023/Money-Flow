@@ -307,11 +307,16 @@ export const SettingsScreen: React.FC = () => {
                 <span className="material-symbols-outlined text-[20px]">sms</span>
               </div>
               <div className="flex flex-col">
-                <span className="font-body text-[15px] font-semibold text-[#E0E0E0]">
-                  SMS / Clipboard UPI Parser
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="font-body text-[15px] font-semibold text-[#E0E0E0]">
+                    SMS Auto-Detection &amp; Parser
+                  </span>
+                  <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.2 rounded-full">
+                    AUTO
+                  </span>
+                </div>
                 <span className="font-body text-[12px] text-[#888888]">
-                  Auto-detect amount, ref &amp; merchant from text
+                  Listen for incoming bank SMS &amp; auto-fill ledger
                 </span>
               </div>
             </div>

@@ -261,8 +261,8 @@ export class StatementService {
     fallbackText?: string,
     categories: Category[] = [],
     existingLedger: Transaction[] = [],
-    accounts: Account[] = [],
-    selectedAccountId?: string
+    accountId: string = 'acc-sbi',
+    accountName: string = 'SBI Savings'
   ): Promise<StatementImportSummary> {
     const isCsv = fileName.toLowerCase().endsWith('.csv');
 
@@ -270,20 +270,12 @@ export class StatementService {
       const csvText = fileBuffer
         ? CsvParser.decodeBufferToString(fileBuffer)
         : (fallbackText || '');
-      const csvAccountNumber = this.extractAccountNumberFromText(csvText);
-      const csvBank = this.detectBankName(csvText, fileName);
-      const csvTarget = this.resolveImportAccount(
-        accounts,
-        selectedAccountId,
-        csvAccountNumber,
-        csvBank
-      );
       const csvResult = CsvParser.parseCsv(
         csvText,
         categories,
         existingLedger,
-        csvTarget.account.id,
-        csvTarget.account.name
+        accountId,
+        accountName
       );
 
       let autoCategorizedCount = 0;
@@ -303,11 +295,6 @@ export class StatementService {
         duplicates: duplicateCount,
         fileName,
         transactions: csvResult.transactions,
-        detectedBank: csvBank,
-        accountNumber: csvAccountNumber,
-        matchedAccountId: csvTarget.account.id,
-        matchedAccountName: csvTarget.account.name,
-        accountMatchSource: csvTarget.source,
       };
     }
 
@@ -320,23 +307,14 @@ export class StatementService {
       lines = fallbackText.split('\n');
     }
 
-    const joinedText = lines.join('\n');
-
     // Check if Kotak Mahindra Bank statement
     if (KotakStatementParser.isKotakStatement(lines) || fileName.toLowerCase().includes('kotak')) {
       const actualLines = lines.length > 0 ? lines : fallbackText?.split('\n') || [];
-      const kotakMeta = KotakStatementParser.extractMetadata(actualLines);
-      const kotakTarget = this.resolveImportAccount(
-        accounts,
-        selectedAccountId,
-        kotakMeta.accountNumber,
-        'Kotak Mahindra Bank'
-      );
       const kotakResult = KotakStatementParser.parseLines(
         actualLines,
         categories,
-        kotakTarget.account.id,
-        kotakTarget.account.name
+        accountId,
+        accountName
       );
 
       let autoCategorizedCount = 0;
@@ -386,20 +364,8 @@ export class StatementService {
         accountNumber: kotakResult.meta.accountNumber,
         openingBalance: kotakResult.meta.openingBalance,
         closingBalance: kotakResult.meta.closingBalance,
-        matchedAccountId: kotakTarget.account.id,
-        matchedAccountName: kotakTarget.account.name,
-        accountMatchSource: kotakTarget.source,
       };
     }
-
-    const sbiAccountNumber = this.extractAccountNumberFromText(joinedText);
-    const sbiBank = this.detectBankName(joinedText, fileName) || 'State Bank of India';
-    const sbiTarget = this.resolveImportAccount(
-      accounts,
-      selectedAccountId,
-      sbiAccountNumber,
-      sbiBank
-    );
 
     let parsedRows = this.parseStatementText(lines);
 
@@ -434,11 +400,7 @@ export class StatementService {
       ];
     }
 
-    const rawTransactions = SbiStatementParser.parseRows(
-      parsedRows,
-      sbiTarget.account.id,
-      sbiTarget.account.name
-    );
+    const rawTransactions = SbiStatementParser.parseRows(parsedRows, accountId, accountName);
 
     let autoCategorizedCount = 0;
     let needsReviewCount = 0;
@@ -506,11 +468,6 @@ export class StatementService {
       duplicates: duplicateCount,
       fileName,
       transactions: processedTransactions,
-      detectedBank: sbiBank,
-      accountNumber: sbiAccountNumber,
-      matchedAccountId: sbiTarget.account.id,
-      matchedAccountName: sbiTarget.account.name,
-      accountMatchSource: sbiTarget.source,
     };
   }
 }

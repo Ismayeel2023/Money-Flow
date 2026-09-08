@@ -57,12 +57,12 @@ interface FinanceContextType {
   updateBudget: (id: string, updates: Partial<Budget>) => void;
   deleteBudget: (id: string) => void;
   importSummary: StatementImportSummary;
-  processStatementUpload: (
-    file?: File | null,
-    sampleType?: string,
-    selectedAccountId?: string
-  ) => Promise<void>;
-  processKotakDemoStatement: (selectedAccountId?: string) => Promise<void>;
+  importDestinationAccountId: string | null;
+  setImportDestinationAccountId: (accountId: string | null) => void;
+  switchImportDestinationAccount: (accountId: string) => void;
+  updateImportTransactionAccount: (transactionId: string, accountId: string) => void;
+  processStatementUpload: (file?: File | null, sampleType?: string, targetAccountId?: string) => Promise<void>;
+  processKotakDemoStatement: (targetAccountId?: string) => Promise<void>;
   acceptImportTransaction: (id: string) => void;
   rejectImportTransaction: (id: string) => void;
   updateImportTransactionCategory: (id: string, categoryId: string) => void;
@@ -770,15 +770,65 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setBudgets((prev) => prev.filter((b) => b.id !== id));
   };
 
-  // Statement Processing
+  // Statement Processing & Destination Account State
   const importSummary = importSummaryState;
+  const [importDestinationAccountId, setImportDestinationAccountId] = useState<string | null>(null);
 
-  const processStatementUpload = async (
-    file?: File | null,
-    sampleType?: string,
-    selectedAccountId?: string
-  ) => {
-    const fallbackAccountId = selectedAccountId || accounts.find((a) => a.isDefault)?.id || accounts[0]?.id;
+  const switchImportDestinationAccount = (accountId: string) => {
+    const targetAcc = accounts.find((a) => a.id === accountId);
+    if (!targetAcc) return;
+
+    setImportDestinationAccountId(accountId);
+    setImportSummaryState((prev) => ({
+      ...prev,
+      detectedBank: targetAcc.name,
+      accountNumber: targetAcc.accountNumber || prev.accountNumber,
+      transactions: prev.transactions.map((tx) => ({
+        ...tx,
+        accountId: targetAcc.id,
+        accountName: targetAcc.name,
+      })),
+    }));
+  };
+
+  const updateImportTransactionAccount = (transactionId: string, accountId: string) => {
+    const targetAcc = accounts.find((a) => a.id === accountId);
+    if (!targetAcc) return;
+
+    setImportSummaryState((prev) => ({
+      ...prev,
+      transactions: prev.transactions.map((tx) =>
+        tx.id === transactionId
+          ? { ...tx, accountId: targetAcc.id, accountName: targetAcc.name }
+          : tx
+      ),
+    }));
+  };
+
+  const processStatementUpload = async (file?: File | null, sampleType?: string, targetAccountId?: string) => {
+    // Determine effective target account:
+    // 1. Explicit argument or pre-selected dropdown
+    const effectiveTargetId = targetAccountId || importDestinationAccountId;
+    let chosenAccount = effectiveTargetId ? accounts.find((a) => a.id === effectiveTargetId) : null;
+
+    // 2. Intelligent inference from filename if not explicitly chosen
+    if (!chosenAccount && file) {
+      const lowerName = file.name.toLowerCase();
+      if (lowerName.includes('kotak')) {
+        chosenAccount = accounts.find((a) => a.name.toLowerCase().includes('kotak') || a.accountNumber === '6402') || null;
+      } else if (lowerName.includes('sbi')) {
+        chosenAccount = accounts.find((a) => a.name.toLowerCase().includes('sbi') || a.accountNumber === '4589') || null;
+      } else if (lowerName.includes('hdfc')) {
+        chosenAccount = accounts.find((a) => a.name.toLowerCase().includes('hdfc')) || null;
+      } else if (lowerName.includes('icici')) {
+        chosenAccount = accounts.find((a) => a.name.toLowerCase().includes('icici')) || null;
+      }
+    } else if (!chosenAccount && sampleType === 'kotak') {
+      chosenAccount = accounts.find((a) => a.name.toLowerCase().includes('kotak') || a.accountNumber === '6402') || null;
+    }
+
+    const defaultAccId = chosenAccount?.id || accounts[0]?.id || 'acc-sbi';
+    const defaultAccName = chosenAccount?.name || accounts[0]?.name || 'SBI Savings';
 
     let summary: StatementImportSummary;
     if (file) {
@@ -789,47 +839,84 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         undefined,
         categories,
         transactions,
-        accounts,
-        fallbackAccountId
+        defaultAccId,
+        defaultAccName
       );
     } else if (sampleType === 'kotak') {
+      const kotakAcc = chosenAccount || accounts.find((a) => a.name.toLowerCase().includes('kotak')) || {
+        id: 'acc-kotak-6402',
+        name: 'Kotak Savings (6402)',
+      };
       summary = await StatementService.processStatementFile(
         'Kotak_Account_Statement_Sep2026.pdf',
         undefined,
         KOTAK_SAMPLE_STATEMENT_TEXT,
         categories,
         transactions,
-        accounts,
-        fallbackAccountId
+        kotakAcc.id,
+        kotakAcc.name
       );
     } else {
+      // Demo / fallback statement processing (SBI)
       summary = await StatementService.processStatementFile(
         'SBI_Account_Statement.pdf',
         undefined,
         undefined,
         categories,
         transactions,
-        accounts,
-        fallbackAccountId
+        defaultAccId,
+        defaultAccName
       );
     }
 
-    if (summary.matchedAccountId && summary.accountNumber) {
-      setAccounts((prev) =>
-        prev.map((a) => {
-          if (a.id !== summary.matchedAccountId || a.accountNumber) return a;
-          const digits = summary.accountNumber!.replace(/\D/g, '');
-          return { ...a, accountNumber: digits.slice(-4) };
-        })
+    // Auto-create or link Kotak account if statement is from Kotak Mahindra Bank
+    if (summary.detectedBank === 'Kotak Mahindra Bank') {
+      const existingKotak = accounts.find(
+        (a) => a.id === 'acc-kotak-6402' || a.accountNumber === '6402' || a.name.toLowerCase().includes('kotak')
       );
+      if (!existingKotak) {
+        const newKotakAcc: Account = {
+          id: 'acc-kotak-6402',
+          name: 'Kotak Savings',
+          type: 'bank',
+          accountNumber: summary.accountNumber || '6402',
+          balance: summary.closingBalance ?? 2647.71,
+          icon: 'account_balance',
+          color: '#ED1C24',
+        };
+        setAccounts((prev) => [...prev, newKotakAcc]);
+        summary.transactions = summary.transactions.map((tx) => ({
+          ...tx,
+          accountId: newKotakAcc.id,
+          accountName: newKotakAcc.name,
+        }));
+      } else if (!chosenAccount) {
+        // Automatically route transactions to existing Kotak account
+        summary.transactions = summary.transactions.map((tx) => ({
+          ...tx,
+          accountId: existingKotak.id,
+          accountName: existingKotak.name,
+        }));
+      }
     }
 
+    // If a specific account was explicitly chosen by the user, ensure all transactions reflect it
+    if (chosenAccount) {
+      summary.transactions = summary.transactions.map((tx) => ({
+        ...tx,
+        accountId: chosenAccount!.id,
+        accountName: chosenAccount!.name,
+      }));
+    }
+
+    const assignedAccountId = summary.transactions[0]?.accountId || defaultAccId;
+    setImportDestinationAccountId(assignedAccountId);
     setImportSummaryState(summary);
     setTab('import-statement');
   };
 
-  const processKotakDemoStatement = async (selectedAccountId?: string) => {
-    await processStatementUpload(null, 'kotak', selectedAccountId);
+  const processKotakDemoStatement = async (targetAccountId?: string) => {
+    await processStatementUpload(null, 'kotak', targetAccountId);
   };
 
   // Subscriptions & Recurring Expenses State
@@ -1038,6 +1125,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const exportToJson = (): string => {
     const backupData = {
+      appName: 'Money Flow',
       version: '2.0',
       exportedAt: new Date().toISOString(),
       transactions,
@@ -1046,6 +1134,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       budgets,
       subscriptions,
       savingsGoals,
+      securitySettings,
     };
     return JSON.stringify(backupData, null, 2);
   };
@@ -1053,28 +1142,57 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const importFromJson = (jsonStr: string): { success: boolean; message: string } => {
     try {
       const data = JSON.parse(jsonStr);
-      if (!data) return { success: false, message: 'Invalid JSON file.' };
+      if (!data || typeof data !== 'object') return { success: false, message: 'Invalid JSON file.' };
+
+      let txCount = 0;
+      let accCount = 0;
 
       if (Array.isArray(data.transactions)) {
         setTransactions(data.transactions);
+        try {
+          localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(data.transactions));
+        } catch {}
+        txCount = data.transactions.length;
       }
       if (Array.isArray(data.accounts)) {
         setAccounts(data.accounts);
+        try {
+          localStorage.setItem(STORAGE_KEYS.ACCOUNTS, JSON.stringify(data.accounts));
+        } catch {}
+        accCount = data.accounts.length;
       }
       if (Array.isArray(data.categories)) {
         setCategories(data.categories);
+        try {
+          localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(data.categories));
+        } catch {}
       }
       if (Array.isArray(data.budgets)) {
         setBudgets(data.budgets);
+        try {
+          localStorage.setItem(STORAGE_KEYS.BUDGETS, JSON.stringify(data.budgets));
+        } catch {}
       }
       if (Array.isArray(data.subscriptions)) {
         setSubscriptions(data.subscriptions);
+        try {
+          localStorage.setItem('moneyflow_subscriptions_v1', JSON.stringify(data.subscriptions));
+        } catch {}
       }
       if (Array.isArray(data.savingsGoals)) {
         setSavingsGoals(data.savingsGoals);
+        try {
+          localStorage.setItem('moneyflow_savings_goals_v1', JSON.stringify(data.savingsGoals));
+        } catch {}
+      }
+      if (data.securitySettings && typeof data.securitySettings === 'object') {
+        updateSecuritySettings(data.securitySettings);
       }
 
-      return { success: true, message: 'Backup restored successfully!' };
+      return {
+        success: true,
+        message: `Restored successfully! ${txCount} transactions across ${accCount} accounts loaded.`,
+      };
     } catch (err: any) {
       return { success: false, message: err?.message || 'Failed to parse JSON backup.' };
     }
@@ -1222,6 +1340,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         updateBudget,
         deleteBudget,
         importSummary,
+        importDestinationAccountId,
+        setImportDestinationAccountId,
+        switchImportDestinationAccount,
+        updateImportTransactionAccount,
         processStatementUpload,
         processKotakDemoStatement,
         acceptImportTransaction,

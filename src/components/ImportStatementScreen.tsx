@@ -1,42 +1,51 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useFinance } from '../context/FinanceContext';
-import { CustomDropdown } from './CustomDropdown';
 
 export const ImportStatementScreen: React.FC = () => {
   const {
-    accounts,
     importSummary,
+    accounts,
+    importDestinationAccountId,
+    setImportDestinationAccountId,
+    switchImportDestinationAccount,
     setTab,
     goBack,
     processStatementUpload,
     processKotakDemoStatement,
     formatCurrency,
   } = useFinance();
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const defaultAccountId =
-    accounts.find((a) => a.isDefault)?.id || accounts.find((a) => a.type === 'bank')?.id || accounts[0]?.id || '';
-  const [selectedAccountId, setSelectedAccountId] = React.useState<string>(defaultAccountId);
 
-  React.useEffect(() => {
-    if (!selectedAccountId && defaultAccountId) {
-      setSelectedAccountId(defaultAccountId);
-    }
-  }, [defaultAccountId, selectedAccountId]);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [selectedUploadAccount, setSelectedUploadAccount] = useState<string>(
+    importDestinationAccountId || accounts[0]?.id || ''
+  );
+  const [showSwitchModal, setShowSwitchModal] = useState<boolean>(false);
+  const [accountSwitchedNotice, setAccountSwitchedNotice] = useState<string | null>(null);
+
+  // Identify current assigned account for this batch
+  const currentAssignedAccountId =
+    importSummary.transactions[0]?.accountId ||
+    importDestinationAccountId ||
+    accounts[0]?.id;
+  const currentAssignedAccount =
+    accounts.find((a) => a.id === currentAssignedAccountId) || accounts[0];
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      processStatementUpload(file, undefined, selectedAccountId);
+      processStatementUpload(file, undefined, selectedUploadAccount || undefined);
     }
-    e.target.value = '';
   };
 
-  const matchLabel =
-    importSummary.accountMatchSource === 'account-number'
-      ? 'Matched by account number'
-      : importSummary.accountMatchSource === 'bank-name'
-        ? 'Matched by bank name'
-        : 'Using the account you selected';
+  const handleSwitchAccount = (newAccountId: string) => {
+    switchImportDestinationAccount(newAccountId);
+    const targetAcc = accounts.find((a) => a.id === newAccountId);
+    setShowSwitchModal(false);
+    if (targetAcc) {
+      setAccountSwitchedNotice(`Switched all transactions to ${targetAcc.name}`);
+      setTimeout(() => setAccountSwitchedNotice(null), 3000);
+    }
+  };
 
   return (
     <div className="flex flex-col w-full max-w-md mx-auto px-5 pt-4 sm:pt-5 pb-32 gap-6">
@@ -49,74 +58,110 @@ export const ImportStatementScreen: React.FC = () => {
       />
 
       {/* Hero / Summary Card */}
-      <div className="relative bg-[#1A1A1A] rounded-3xl overflow-hidden shadow-sm flex flex-col items-center justify-center py-8 px-6 text-center mt-1 border border-[#262626]">
+      <div className="relative bg-[#1A1A1A] rounded-3xl overflow-hidden shadow-sm flex flex-col items-center justify-center py-7 px-6 text-center mt-1 border border-[#262626]">
         <div className="absolute inset-0 bg-gradient-to-br from-[#D4AF37]/10 via-transparent to-transparent opacity-60 pointer-events-none" />
 
         <div className="relative z-10 flex flex-col items-center gap-2 w-full">
-          <div className="w-20 h-20 rounded-full bg-[#D4AF37] text-[#0F0F0F] flex items-center justify-center mb-2 shadow-[0_4px_24px_rgba(212,175,55,0.3)]">
-            <span className="material-symbols-outlined text-[40px] material-symbols-fill">
+          <div className="w-18 h-18 rounded-full bg-[#D4AF37] text-[#0F0F0F] flex items-center justify-center mb-1.5 shadow-[0_4px_24px_rgba(212,175,55,0.3)]">
+            <span className="material-symbols-outlined text-[36px] material-symbols-fill">
               {importSummary.totalFound > 0 ? 'cloud_done' : 'upload_file'}
             </span>
           </div>
-          <h1 className="font-display text-[26px] sm:text-[28px] font-bold text-[#FFFFFF]">
-            {importSummary.totalFound > 0 ? 'Statement Processed' : 'Import Statement'}
+          <h1 className="font-display text-[24px] sm:text-[26px] font-bold text-[#FFFFFF]">
+            {importSummary.totalFound > 0 ? 'Statement Processed' : 'Import Bank Statement'}
           </h1>
-          <p className="font-body text-[14px] text-[#888888] max-w-[320px]">
+          <p className="font-body text-[13px] text-[#888888] max-w-[320px]">
             {importSummary.totalFound > 0
-              ? `Found ${importSummary.totalFound} transactions from ${importSummary.fileName}.`
-              : 'Upload your Kotak, SBI, or other bank PDF/CSV statement to extract transactions.'}
+              ? `Extracted ${importSummary.totalFound} transactions from ${importSummary.fileName}.`
+              : 'Upload your Kotak, SBI, HDFC, ICICI, or other bank PDF statement.'}
           </p>
 
           {/* Detected Bank Banner */}
-          {importSummary.totalFound > 0 && importSummary.matchedAccountName && (
-            <div className="mt-2 px-4 py-2 rounded-2xl bg-[#10B981]/10 border border-[#10B981]/30 flex items-center gap-2 text-left w-full max-w-[340px]">
-              <span className="material-symbols-outlined text-[#34D399] text-[20px]">account_balance_wallet</span>
-              <div>
-                <span className="text-[13px] font-bold text-[#FFFFFF] block">
-                  {importSummary.matchedAccountName}
-                </span>
-                <span className="text-[11px] text-[#A0A0A0]">{matchLabel}</span>
-              </div>
-            </div>
-          )}
           {importSummary.totalFound > 0 && importSummary.detectedBank && (
-            <div className="mt-3 px-4 py-2 rounded-2xl bg-[#D4AF37]/10 border border-[#D4AF37]/30 flex items-center gap-2 text-left">
-              <span className="material-symbols-outlined text-[#D4AF37] text-[20px]">account_balance</span>
-              <div>
-                <span className="text-[13px] font-bold text-[#FFFFFF] block">
-                  {importSummary.detectedBank}
-                  {importSummary.accountNumber ? ` • A/C ${importSummary.accountNumber}` : ''}
-                </span>
-                <span className="text-[11px] text-[#A0A0A0]">
-                  {importSummary.openingBalance !== undefined ? `Open: ${formatCurrency(importSummary.openingBalance)} • ` : ''}
-                  {importSummary.closingBalance !== undefined ? `Close: ${formatCurrency(importSummary.closingBalance)}` : ''}
-                </span>
+            <div className="mt-2 px-3.5 py-2 rounded-2xl bg-[#D4AF37]/10 border border-[#D4AF37]/30 flex items-center gap-2 text-left w-full justify-between">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#D4AF37] text-[20px]">account_balance</span>
+                <div>
+                  <span className="text-[13px] font-bold text-[#FFFFFF] block">
+                    Statement: {importSummary.detectedBank}
+                    {importSummary.accountNumber ? ` • A/C ${importSummary.accountNumber}` : ''}
+                  </span>
+                  <span className="text-[11px] text-[#A0A0A0]">
+                    {importSummary.openingBalance !== undefined ? `Opening: ${formatCurrency(importSummary.openingBalance)} • ` : ''}
+                    {importSummary.closingBalance !== undefined ? `Closing: ${formatCurrency(importSummary.closingBalance)}` : ''}
+                  </span>
+                </div>
               </div>
             </div>
           )}
         </div>
       </div>
 
+      {/* Account Switched Notification Banner */}
+      {accountSwitchedNotice && (
+        <div className="bg-emerald-500/15 border border-emerald-500/40 rounded-2xl p-3 flex items-center gap-2 text-emerald-400 text-[13px] font-semibold animate-in fade-in slide-in-from-top-2">
+          <span className="material-symbols-outlined text-[20px]">check_circle</span>
+          <span>{accountSwitchedNotice}</span>
+        </div>
+      )}
+
       {importSummary.totalFound === 0 ? (
         <div className="flex flex-col gap-4">
-          <div className="bg-[#1A1A1A] rounded-2xl p-4 border border-[#262626] flex flex-col gap-2">
-            <CustomDropdown
-              id="import-target-account"
-              label="Import into account"
-              options={accounts.map((a) => ({
-                id: a.id,
-                label: a.name,
-                icon: a.type === 'credit' ? 'credit_card' : a.type === 'cash' ? 'payments' : 'account_balance',
-                sublabel: a.accountNumber ? `A/C ••••${a.accountNumber.slice(-4)}` : a.type.toUpperCase(),
-                color: a.color || '#D4AF37',
-              }))}
-              value={selectedAccountId}
-              onChange={setSelectedAccountId}
-              searchable={accounts.length > 4}
-            />
-            <p className="font-body text-[12px] text-[#888888] leading-relaxed">
-              Select the account this statement belongs to. If the PDF/CSV includes an account number that matches one of yours, that account is used instead.
-            </p>
+          {/* Pre-Upload Target Account Selector */}
+          <div className="bg-[#1A1A1A] border border-[#262626] rounded-2xl p-4 flex flex-col gap-2.5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <label className="text-[12px] font-bold text-[#D4AF37] tracking-wider uppercase flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[16px]">account_balance_wallet</span>
+                <span>Destination Bank Account</span>
+              </label>
+              <span className="text-[11px] text-[#888888]">Choose where transactions go</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {accounts.map((acc) => {
+                const isSelected = selectedUploadAccount === acc.id;
+                return (
+                  <button
+                    key={acc.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedUploadAccount(acc.id);
+                      setImportDestinationAccountId(acc.id);
+                    }}
+                    className={`flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
+                      isSelected
+                        ? 'bg-[#D4AF37]/15 border-[#D4AF37] text-white'
+                        : 'bg-[#141414] border-[#2A2A2A] text-[#B0B0B0] hover:border-[#3A3A3A]'
+                    }`}
+                  >
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                      style={{
+                        backgroundColor: `${acc.color || '#D4AF37'}20`,
+                        color: acc.color || '#D4AF37',
+                      }}
+                    >
+                      <span className="material-symbols-outlined text-[18px]">
+                        {acc.icon || 'account_balance'}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-[13px] truncate">{acc.name}</span>
+                        {isSelected && (
+                          <span className="material-symbols-outlined text-[#D4AF37] text-[18px]">
+                            check_circle
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[11px] text-[#888888] block truncate">
+                        {acc.accountNumber ? `A/C •••• ${acc.accountNumber.slice(-4)}` : formatCurrency(acc.balance)}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <button
@@ -137,7 +182,7 @@ export const ImportStatementScreen: React.FC = () => {
           {/* 1-Click Demo Statements */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <button
-              onClick={() => processKotakDemoStatement(selectedAccountId)}
+              onClick={() => processKotakDemoStatement(selectedUploadAccount || undefined)}
               className="bg-[#1A1A1A] hover:bg-[#242424] border border-[#ED1C24]/30 hover:border-[#ED1C24] p-3.5 rounded-2xl text-left flex items-center gap-3 transition-all active:scale-[0.98]"
             >
               <div className="w-10 h-10 rounded-xl bg-[#ED1C24]/15 text-[#ED1C24] flex items-center justify-center shrink-0">
@@ -154,7 +199,7 @@ export const ImportStatementScreen: React.FC = () => {
             </button>
 
             <button
-              onClick={() => processStatementUpload(null, undefined, selectedAccountId)}
+              onClick={() => processStatementUpload(null, undefined, selectedUploadAccount || undefined)}
               className="bg-[#1A1A1A] hover:bg-[#242424] border border-[#3525cd]/30 hover:border-[#3525cd] p-3.5 rounded-2xl text-left flex items-center gap-3 transition-all active:scale-[0.98]"
             >
               <div className="w-10 h-10 rounded-xl bg-[#3525cd]/15 text-[#6366f1] flex items-center justify-center shrink-0">
@@ -187,6 +232,139 @@ export const ImportStatementScreen: React.FC = () => {
         </div>
       ) : (
         <>
+          {/* Target Bank Account Card with 1-Tap Switcher */}
+          <div className="bg-[#1A1A1A] rounded-2xl p-4 border-2 border-[#D4AF37]/60 shadow-md flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[#D4AF37] flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[16px]">account_balance</span>
+                <span>Assigned Bank Account</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowSwitchModal(true)}
+                className="px-3 py-1.5 rounded-full bg-[#D4AF37] hover:bg-[#E5C158] text-[#0F0F0F] text-[12px] font-bold flex items-center gap-1 transition-all active:scale-95 shadow-sm"
+              >
+                <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
+                <span>Switch Bank</span>
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between bg-[#121212] p-3 rounded-xl border border-[#262626]">
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                  style={{
+                    backgroundColor: `${currentAssignedAccount?.color || '#D4AF37'}20`,
+                    color: currentAssignedAccount?.color || '#D4AF37',
+                  }}
+                >
+                  <span className="material-symbols-outlined text-[20px]">
+                    {currentAssignedAccount?.icon || 'account_balance'}
+                  </span>
+                </div>
+                <div>
+                  <h4 className="font-bold text-[15px] text-[#FFFFFF]">
+                    {currentAssignedAccount?.name || 'Bank Account'}
+                  </h4>
+                  <p className="text-[12px] text-[#888888]">
+                    {currentAssignedAccount?.accountNumber
+                      ? `A/C •••• ${currentAssignedAccount.accountNumber.slice(-4)}`
+                      : 'Active Ledger Account'}{' '}
+                    • Balance: {formatCurrency(currentAssignedAccount?.balance || 0)}
+                  </p>
+                </div>
+              </div>
+              <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
+                ACTIVE
+              </span>
+            </div>
+
+            <p className="text-[12px] text-[#A0A0A0] leading-snug">
+              All <strong className="text-white">{importSummary.totalFound}</strong> transactions from this statement will be imported into <strong className="text-[#D4AF37]">{currentAssignedAccount?.name}</strong>. Tap &quot;Switch Bank&quot; if this PDF belongs to another account.
+            </p>
+          </div>
+
+          {/* Quick Bank Switcher Modal / Dropdown */}
+          {showSwitchModal && (
+            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 animate-in fade-in">
+              <div className="bg-[#1A1A1A] border border-[#333333] rounded-3xl w-full max-w-md p-5 flex flex-col gap-4 shadow-2xl">
+                <div className="flex items-center justify-between border-b border-[#262626] pb-3">
+                  <div>
+                    <h3 className="font-display text-[18px] font-bold text-white">
+                      Select Destination Account
+                    </h3>
+                    <p className="text-[12px] text-[#888888]">
+                      Switch all {importSummary.totalFound} transactions to another bank
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowSwitchModal(false)}
+                    className="w-8 h-8 rounded-full bg-[#262626] text-[#888888] hover:text-white flex items-center justify-center"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">close</span>
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto">
+                  {accounts.map((acc) => {
+                    const isSelected = acc.id === currentAssignedAccountId;
+                    return (
+                      <button
+                        key={acc.id}
+                        onClick={() => handleSwitchAccount(acc.id)}
+                        className={`flex items-center justify-between p-3.5 rounded-2xl border text-left transition-all ${
+                          isSelected
+                            ? 'bg-[#D4AF37]/15 border-[#D4AF37] text-white shadow-sm'
+                            : 'bg-[#141414] border-[#262626] hover:border-[#3A3A3A] text-[#B0B0B0]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                            style={{
+                              backgroundColor: `${acc.color || '#D4AF37'}20`,
+                              color: acc.color || '#D4AF37',
+                            }}
+                          >
+                            <span className="material-symbols-outlined text-[22px]">
+                              {acc.icon || 'account_balance'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="font-bold text-[14px] text-white block">
+                              {acc.name}
+                            </span>
+                            <span className="text-[12px] text-[#888888]">
+                              {acc.accountNumber ? `A/C •••• ${acc.accountNumber.slice(-4)} • ` : ''}
+                              {formatCurrency(acc.balance)}
+                            </span>
+                          </div>
+                        </div>
+
+                        {isSelected ? (
+                          <span className="material-symbols-outlined text-[#D4AF37] text-[22px]">
+                            check_circle
+                          </span>
+                        ) : (
+                          <span className="text-[12px] font-bold text-[#D4AF37] bg-[#D4AF37]/10 px-2.5 py-1 rounded-full border border-[#D4AF37]/30">
+                            Select
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button
+                  onClick={() => setShowSwitchModal(false)}
+                  className="w-full py-3 rounded-full bg-[#262626] text-white font-bold text-[14px] hover:bg-[#333333] transition-all"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Stats Grid */}
           <div className="grid grid-cols-2 gap-3.5 w-full">
             {/* Total Found */}
@@ -251,52 +429,8 @@ export const ImportStatementScreen: React.FC = () => {
             </div>
           )}
 
-          {/* Status Legend */}
-          <div className="flex flex-col gap-2.5 pt-1">
-            <h2 className="font-display text-[20px] font-bold text-[#E0E0E0] mb-1">
-              Status Overview
-            </h2>
-
-            {/* New */}
-            <div className="bg-[#1A1A1A] rounded-2xl p-4 shadow-sm border border-[#262626] flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-[#10B981]" />
-                <span className="font-body text-[15px] font-semibold text-[#E0E0E0]">New</span>
-              </div>
-              <span className="font-body text-[12px] font-bold text-[#34D399] tracking-wider">
-                READY
-              </span>
-            </div>
-
-            {/* Already Imported */}
-            <div className="bg-[#1A1A1A] rounded-2xl p-4 shadow-sm border border-[#262626] flex items-center justify-between opacity-75">
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-[#888888]" />
-                <span className="font-body text-[15px] font-semibold text-[#E0E0E0]">
-                  Already Imported
-                </span>
-              </div>
-              <span className="font-body text-[12px] font-bold text-[#888888] tracking-wider">
-                SKIPPED
-              </span>
-            </div>
-
-            {/* Possible Duplicate */}
-            <div className="bg-[#1A1A1A] rounded-2xl p-4 shadow-sm border border-[#262626] flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-[#FB7185]" />
-                <span className="font-body text-[15px] font-semibold text-[#E0E0E0]">
-                  Possible Duplicate
-                </span>
-              </div>
-              <span className="font-body text-[12px] font-bold text-[#FB7185] tracking-wider">
-                ACTION REQUIRED
-              </span>
-            </div>
-          </div>
-
           {/* Action Buttons */}
-          <div className="flex flex-col gap-3 mt-3">
+          <div className="flex flex-col gap-3 mt-1">
             <button
               id="btn-review-transactions"
               onClick={() => setTab('import-review')}
@@ -309,7 +443,7 @@ export const ImportStatementScreen: React.FC = () => {
             <button
               id="btn-cancel-import"
               onClick={() => goBack()}
-              className="w-full bg-transparent text-[#D4AF37] hover:bg-[#D4AF37]/10 rounded-full py-4 font-body text-[15px] font-bold border border-[#D4AF37]/30 active:scale-[0.98] transition-all"
+              className="w-full bg-transparent text-[#D4AF37] hover:bg-[#D4AF37]/10 rounded-full py-3.5 font-body text-[15px] font-bold border border-[#D4AF37]/30 active:scale-[0.98] transition-all"
             >
               Cancel Import
             </button>
