@@ -369,7 +369,14 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const unlockApp = (enteredPin?: string): boolean => {
-    if (!enteredPin || enteredPin === securitySettings.pin) {
+    if (enteredPin == null || enteredPin === '') {
+      setIsAppLocked(false);
+      try {
+        sessionStorage.setItem('moneyflow_session_unlocked', 'true');
+      } catch {}
+      return true;
+    }
+    if (String(enteredPin) === String(securitySettings.pin)) {
       setIsAppLocked(false);
       try {
         sessionStorage.setItem('moneyflow_session_unlocked', 'true');
@@ -1230,20 +1237,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
 
     const setup = async () => {
-      const enabled = await refreshNotificationAccess();
+      await refreshNotificationAccess();
       if (cancelled) return;
-
-      if (isNativeAndroid()) {
-        try {
-          const prompted = localStorage.getItem(NOTIFICATION_PROMPT_KEY);
-          const denied = smsPermissionLevel === 'denied';
-          if (!enabled && !prompted && !denied) {
-            setShowSmsPermissionModal(true);
-          }
-        } catch {
-          if (!enabled) setShowSmsPermissionModal(true);
-        }
-      }
 
       const notificationHandle = await NotificationAccess.addListener('notificationPosted', handlePosted);
       const resumeHandle = await App.addListener('resume', async () => {
@@ -1268,9 +1263,34 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       cancelled = true;
       teardown?.();
     };
-    // Prompt-once on mount; permission level is read from localStorage on first paint.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (isAppLocked) {
+      setShowSmsPermissionModal(false);
+      return;
+    }
+    if (!isNativeAndroid()) return;
+
+    let cancelled = false;
+    const maybePrompt = async () => {
+      const enabled = await refreshNotificationAccess();
+      if (cancelled || enabled) return;
+      try {
+        const prompted = localStorage.getItem(NOTIFICATION_PROMPT_KEY);
+        if (!prompted && smsPermissionLevel !== 'denied') {
+          setShowSmsPermissionModal(true);
+        }
+      } catch {
+        setShowSmsPermissionModal(true);
+      }
+    };
+    maybePrompt();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAppLocked]);
 
   // Export & Backup
   const exportToCsv = (): string => {

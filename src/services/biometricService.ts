@@ -1,8 +1,10 @@
 /**
  * Biometric Authentication Service
- * Integrates Web Authentication API (WebAuthn / PublicKeyCredential)
- * for Android Fingerprint / Face Unlock, iOS Face ID / Touch ID, and Windows Hello.
+ * Uses native Android BiometricPrompt in the Capacitor app, and WebAuthn on web.
  */
+
+import { Capacitor } from '@capacitor/core';
+import { DeviceUnlock } from '../plugins/deviceUnlock';
 
 export interface BiometricCapability {
   isSupported: boolean;
@@ -102,9 +104,35 @@ class BiometricServiceImpl {
     }
 
     const isSupported = Boolean(
-      window.PublicKeyCredential &&
-      typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function'
+      (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') ||
+      (window.PublicKeyCredential &&
+      typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === 'function')
     );
+
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+      try {
+        const native = await DeviceUnlock.isAvailable();
+        return {
+          isSupported: true,
+          hasPlatformAuthenticator: native.available,
+          authenticatorType: device.type,
+          platformLabel: device.label,
+          platformIcon: device.icon,
+          isEnrolled: enrolled || native.available,
+          enrolledDate,
+        };
+      } catch {
+        return {
+          isSupported: true,
+          hasPlatformAuthenticator: true,
+          authenticatorType: device.type,
+          platformLabel: device.label,
+          platformIcon: device.icon,
+          isEnrolled: enrolled,
+          enrolledDate,
+        };
+      }
+    }
 
     if (!isSupported) {
       return {
@@ -170,6 +198,34 @@ class BiometricServiceImpl {
    * Explicitly enroll / register device biometric hardware (Fingerprint, Face ID, or Windows Hello).
    */
   async registerBiometricCredential(userName: string = 'Vault Owner'): Promise<AuthResult> {
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+      const result = await DeviceUnlock.authenticate({
+        reason: 'Confirm fingerprint or device lock to enable biometric unlock',
+      });
+      if (!result.success) {
+        return {
+          success: false,
+          method: 'biometric',
+          error: result.error || 'Biometric enrollment was canceled.',
+        };
+      }
+      localStorage.setItem(this.credentialIdKey, 'native_android_biometric');
+      localStorage.setItem(
+        this.credentialMetaKey,
+        JSON.stringify({
+          enrolledDate: new Date().toLocaleDateString('en-IN', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          type: 'Android Fingerprint / Face Unlock',
+        })
+      );
+      return { success: true, method: 'biometric' };
+    }
+
     if (typeof window === 'undefined' || !window.PublicKeyCredential) {
       return {
         success: false,
@@ -302,6 +358,23 @@ class BiometricServiceImpl {
    * Prompt the user for biometric authentication (Fingerprint, Face Unlock, or Device Screen Lock).
    */
   async authenticateWithBiometrics(userName: string = 'Account Owner'): Promise<AuthResult> {
+    if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+      const result = await DeviceUnlock.authenticate({
+        reason: userName ? `Unlock for ${userName}` : 'Unlock Money Flow',
+      });
+      if (result.success) {
+        if ('vibrate' in navigator) {
+          navigator.vibrate?.(60);
+        }
+        return { success: true, method: 'biometric' };
+      }
+      return {
+        success: false,
+        method: 'biometric',
+        error: result.error || 'Biometric unlock was canceled.',
+      };
+    }
+
     const storedCredId = typeof window !== 'undefined' ? localStorage.getItem(this.credentialIdKey) : null;
 
     // If previously enrolled via touch or WebAuthn is absent
