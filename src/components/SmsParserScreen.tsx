@@ -11,8 +11,6 @@ export const SmsParserScreen: React.FC = () => {
     categories,
     addTransactionFromSms,
     formatCurrency,
-    setShowSmsPermissionModal,
-    notificationAccessEnabled,
   } = useFinance();
 
   const [inputText, setInputText] = useState<string>('');
@@ -67,21 +65,9 @@ export const SmsParserScreen: React.FC = () => {
     const ac = new AbortController();
     abortControllerRef.current = ac;
 
-    if (!notificationAccessEnabled) {
-      setShowSmsPermissionModal(true);
-      setPermissionNotice('Grant Notification access so incoming bank SMS can be detected automatically.');
-      setIsListeningForSms(true);
-      setSmsPermissionState('granted');
-      return;
-    }
-
     setIsListeningForSms(true);
     setSmsPermissionState('granted');
-    setPermissionNotice(
-      notificationAccessEnabled
-        ? 'Notification access is on. Waiting for incoming bank SMS...'
-        : 'Turn on Money Flow in Notification access, then return here.'
-    );
+    setPermissionNotice('Paste a bank SMS below, or tap Simulate Incoming SMS to try a sample.');
 
     // If WebOTP API is supported, listen for native incoming SMS
     if ('OTPCredential' in window && navigator.credentials) {
@@ -205,7 +191,7 @@ export const SmsParserScreen: React.FC = () => {
             </h3>
           </div>
 
-            {isListeningForSms || notificationAccessEnabled ? (
+            {isListeningForSms ? (
             <span className="flex items-center gap-1.5 text-[11px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-2.5 py-1 rounded-full">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
               LISTENING
@@ -218,8 +204,7 @@ export const SmsParserScreen: React.FC = () => {
         </div>
 
         <p className="text-[12px] text-[#A0A0A0] leading-relaxed">
-          Grant Notification access, then turn on Money Flow in Android settings. Incoming bank SMS and UPI alerts are read on-device and auto-filled.
-          {notificationAccessEnabled ? ' Access is currently granted.' : ' Access is currently off.'}
+          Paste a bank debit/credit SMS or UPI alert. Money Flow parses amount, merchant, and reference on your device — nothing is uploaded.
         </p>
 
         {/* Action Controls */}
@@ -231,7 +216,7 @@ export const SmsParserScreen: React.FC = () => {
               className="px-4 py-2.5 rounded-full bg-[#D4AF37] hover:bg-[#E5C158] text-[#0F0F0F] font-bold text-[13px] shadow-md flex items-center gap-1.5 transition-all active:scale-95"
             >
               <span className="material-symbols-outlined text-[18px]">sensors</span>
-              <span>Grant notification access</span>
+              <span>Listen &amp; paste SMS</span>
             </button>
           ) : (
             <button

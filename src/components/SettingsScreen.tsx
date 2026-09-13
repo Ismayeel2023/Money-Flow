@@ -11,8 +11,6 @@ export const SettingsScreen: React.FC = () => {
     setIsSecurityModalOpen,
     setIsAppSettingsModalOpen,
     resetToDemoData,
-    notificationAccessEnabled,
-    setShowSmsPermissionModal,
   } = useFinance();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -301,12 +299,7 @@ export const SettingsScreen: React.FC = () => {
           {/* SMS & Clipboard UPI Parser */}
           <button
             id="settings-item-sms-parser"
-            onClick={() => {
-              if (!notificationAccessEnabled) {
-                setShowSmsPermissionModal(true);
-              }
-              setTab('sms-parser');
-            }}
+            onClick={() => setTab('sms-parser')}
             className="flex items-center justify-between p-4 hover:bg-[#222222] active:bg-[#262626] transition-colors text-left group"
           >
             <div className="flex items-center gap-3">
@@ -323,9 +316,7 @@ export const SettingsScreen: React.FC = () => {
                   </span>
                 </div>
                 <span className="font-body text-[12px] text-[#888888]">
-                  {notificationAccessEnabled
-                    ? 'Notification access is on — bank SMS can auto-fill the ledger'
-                    : 'Grant notification access to auto-detect bank SMS'}
+                  Paste a bank SMS or UPI alert to auto-fill the ledger
                 </span>
               </div>
             </div>

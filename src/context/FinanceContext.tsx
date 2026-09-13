@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import {
   Account,
   AutomationRule,
@@ -30,9 +30,6 @@ import { ImportService } from '../services/importService';
 import { TransactionService } from '../services/transactionService';
 import { KOTAK_SAMPLE_STATEMENT_TEXT } from '../services/kotakStatementParser';
 import { BiometricService, BiometricCapability, AuthResult } from '../services/biometricService';
-import { SmsParserService } from '../services/smsParserService';
-import { App } from '@capacitor/app';
-import { isNativeAndroid, NotificationAccess } from '../plugins/notificationAccess';
 
 interface FinanceContextType {
   tab: ScreenTab;
@@ -469,11 +466,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return INITIAL_CATEGORIES;
     }
   });
-  const accountsRef = useRef(accounts);
-  const categoriesRef = useRef(categories);
-  const lastSmsFingerprintRef = useRef<string>('');
-  accountsRef.current = accounts;
-  categoriesRef.current = categories;
 
   const [budgets, setBudgets] = useState<Budget[]>(() => {
     try {
@@ -1149,38 +1141,12 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const NOTIFICATION_PROMPT_KEY = 'moneyflow_notification_access_prompted';
   const SMS_PERMISSION_LEVEL_KEY = 'moneyflow_sms_permission_level';
 
-  const refreshNotificationAccess = async (): Promise<boolean> => {
-    if (!isNativeAndroid()) {
-      setNotificationAccessEnabled(false);
-      return false;
-    }
-    try {
-      const status = await NotificationAccess.isEnabled();
-      setNotificationAccessEnabled(status.enabled);
-      if (status.enabled) {
-        setSmsPermissionLevel((current) => (current === 'denied' || current === 'unset' ? 'always_allow' : current));
-      }
-      return status.enabled;
-    } catch {
-      setNotificationAccessEnabled(false);
-      return false;
-    }
-  };
-
   const requestPhoneSmsPermission = async (): Promise<boolean> => {
-    if (!isNativeAndroid()) {
-      setShowSmsPermissionModal(true);
-      return false;
-    }
+    setShowSmsPermissionModal(true);
     try {
-      await NotificationAccess.openSettings();
-      try {
-        localStorage.setItem(NOTIFICATION_PROMPT_KEY, '1');
-      } catch {}
-      return true;
-    } catch {
-      return false;
-    }
+      localStorage.setItem(NOTIFICATION_PROMPT_KEY, '1');
+    } catch {}
+    return false;
   };
 
   const confirmDetectedSms = () => {
@@ -1213,64 +1179,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       localStorage.setItem(SMS_PERMISSION_LEVEL_KEY, smsPermissionLevel);
     } catch {}
   }, [smsPermissionLevel]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const handlePosted = (event: { title?: string; text?: string }) => {
-      const raw = [event.title, event.text].filter(Boolean).join('\n').trim();
-      if (!raw) return;
-      const fingerprint = raw.replace(/\s+/g, ' ').slice(0, 240);
-      if (fingerprint === lastSmsFingerprintRef.current) return;
-      lastSmsFingerprintRef.current = fingerprint;
-      const parsed = SmsParserService.parseSms(raw, accountsRef.current, categoriesRef.current);
-      if (parsed) {
-        setDetectedIncomingSms(parsed);
-      }
-    };
-
-    const setup = async () => {
-      const enabled = await refreshNotificationAccess();
-      if (cancelled) return;
-
-      if (isNativeAndroid()) {
-        try {
-          const prompted = localStorage.getItem(NOTIFICATION_PROMPT_KEY);
-          const denied = smsPermissionLevel === 'denied';
-          if (!enabled && !prompted && !denied) {
-            setShowSmsPermissionModal(true);
-          }
-        } catch {
-          if (!enabled) setShowSmsPermissionModal(true);
-        }
-      }
-
-      const notificationHandle = await NotificationAccess.addListener('notificationPosted', handlePosted);
-      const resumeHandle = await App.addListener('resume', async () => {
-        const nowEnabled = await refreshNotificationAccess();
-        if (nowEnabled) {
-          setShowSmsPermissionModal(false);
-        }
-      });
-
-      return () => {
-        notificationHandle.remove();
-        resumeHandle.remove();
-      };
-    };
-
-    let teardown: (() => void) | undefined;
-    setup().then((fn) => {
-      teardown = fn;
-    });
-
-    return () => {
-      cancelled = true;
-      teardown?.();
-    };
-    // Prompt-once on mount; permission level is read from localStorage on first paint.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Export & Backup
   const exportToCsv = (): string => {
