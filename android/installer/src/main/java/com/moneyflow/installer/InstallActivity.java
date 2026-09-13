@@ -1,5 +1,6 @@
 package com.moneyflow.installer;
 
+import android.app.Activity;
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -13,15 +14,12 @@ import android.provider.Settings;
 import android.widget.Button;
 import android.widget.TextView;
 
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.content.ContextCompat;
-
 import java.io.InputStream;
 import java.io.OutputStream;
 
-public class InstallActivity extends AppCompatActivity {
+public class InstallActivity extends Activity {
     private static final String ACTION_INSTALL_COMPLETE = "com.moneyflow.installer.INSTALL_COMPLETE";
-    private static final String ASSET_APK = "moneyflow.apk";
+    private static final String ASSET_APK = "moneyflow.bin";
 
     private TextView statusText;
 
@@ -30,9 +28,7 @@ public class InstallActivity extends AppCompatActivity {
         public void onReceive(Context context, Intent intent) {
             int status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE);
             if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
-                Intent confirm = Build.VERSION.SDK_INT >= 33
-                        ? intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent.class)
-                        : intent.getParcelableExtra(Intent.EXTRA_INTENT);
+                Intent confirm = intent.getParcelableExtra(Intent.EXTRA_INTENT);
                 if (confirm != null) {
                     startActivity(confirm);
                 }
@@ -60,7 +56,11 @@ public class InstallActivity extends AppCompatActivity {
         installButton.setOnClickListener(v -> startInstall());
 
         IntentFilter filter = new IntentFilter(ACTION_INSTALL_COMPLETE);
-        ContextCompat.registerReceiver(this, installReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED);
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(installReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(installReceiver, filter);
+        }
     }
 
     @Override
@@ -79,6 +79,7 @@ public class InstallActivity extends AppCompatActivity {
             return;
         }
 
+        PackageInstaller.Session session = null;
         try {
             getAssets().open(ASSET_APK).close();
         } catch (Exception e) {
@@ -96,27 +97,37 @@ public class InstallActivity extends AppCompatActivity {
                 params.setPackageSource(PackageInstaller.PACKAGE_SOURCE_STORE);
             }
             int sessionId = installer.createSession(params);
-            try (PackageInstaller.Session session = installer.openSession(sessionId);
-                 InputStream in = getAssets().open(ASSET_APK);
-                 OutputStream out = session.openWrite("moneyflow.apk", 0, -1)) {
+            session = installer.openSession(sessionId);
+            InputStream in = getAssets().open(ASSET_APK);
+            OutputStream out = session.openWrite("moneyflow.apk", 0, -1);
+            try {
                 byte[] buffer = new byte[65536];
                 int read;
                 while ((read = in.read(buffer)) != -1) {
                     out.write(buffer, 0, read);
                 }
                 session.fsync(out);
-                Intent callback = new Intent(ACTION_INSTALL_COMPLETE);
-                callback.setPackage(getPackageName());
-                int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    flags |= PendingIntent.FLAG_MUTABLE;
-                }
-                PendingIntent pendingIntent = PendingIntent.getBroadcast(this, sessionId, callback, flags);
-                session.commit(pendingIntent.getIntentSender());
+            } finally {
+                out.close();
+                in.close();
             }
+            Intent callback = new Intent(ACTION_INSTALL_COMPLETE);
+            callback.setPackage(getPackageName());
+            int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                flags |= PendingIntent.FLAG_MUTABLE;
+            }
+            PendingIntent pendingIntent = PendingIntent.getBroadcast(this, sessionId, callback, flags);
+            session.commit(pendingIntent.getIntentSender());
             statusText.setText("Confirm the Android install prompt for Money Flow.");
         } catch (Exception e) {
             statusText.setText("Could not start install: " + e.getMessage());
+            if (session != null) {
+                try {
+                    session.abandon();
+                } catch (Exception ignored) {
+                }
+            }
         }
     }
 }

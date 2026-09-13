@@ -102,3 +102,4 @@ app/src/main/res/xml/config.xml
 
 # Embedded full app APK copied in CI before building the installer
 installer/src/main/assets/*.apk
+installer/src/main/assets/*.bin

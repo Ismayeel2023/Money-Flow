@@ -31,8 +31,10 @@ android {
             signingConfig signingConfigs.debug
         }
     }
+    androidResources {
+        noCompress += ['bin', 'apk']
+    }
 }
 
 dependencies {
-    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
 }

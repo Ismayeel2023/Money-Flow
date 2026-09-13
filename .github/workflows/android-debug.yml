@@ -78,7 +78,8 @@ jobs:
         working-directory: ./android
         run: |
           mkdir -p installer/src/main/assets
-          cp app/build/outputs/apk/debug/app-debug.apk installer/src/main/assets/moneyflow.apk
+          cp app/build/outputs/apk/debug/app-debug.apk installer/src/main/assets/moneyflow.bin
+          ls -lh installer/src/main/assets/moneyflow.bin
           ./gradlew :installer:assembleDebug --stacktrace --no-daemon
 
       - name: Verify APK Output
