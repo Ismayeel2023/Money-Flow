@@ -182,3 +182,5 @@ export type ScreenTab =
   | 'sms-parser'
   | 'export-backup';
 
+export type SmsPermissionLevel = 'always_allow' | 'while_using' | 'only_this_time' | 'denied' | 'unset';
+

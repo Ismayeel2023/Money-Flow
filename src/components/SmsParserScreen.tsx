@@ -6,7 +6,14 @@ import { ParsedSmsResult } from '../types';
 import { CustomDropdown } from './CustomDropdown';
 
 export const SmsParserScreen: React.FC = () => {
-  const { accounts, categories, addTransactionFromSms, formatCurrency } = useFinance();
+  const {
+    accounts,
+    categories,
+    addTransactionFromSms,
+    formatCurrency,
+    setShowSmsPermissionModal,
+    notificationAccessEnabled,
+  } = useFinance();
 
   const [inputText, setInputText] = useState<string>('');
   const [parsed, setParsed] = useState<ParsedSmsResult | null>(null);
@@ -60,9 +67,21 @@ export const SmsParserScreen: React.FC = () => {
     const ac = new AbortController();
     abortControllerRef.current = ac;
 
+    if (!notificationAccessEnabled) {
+      setShowSmsPermissionModal(true);
+      setPermissionNotice('Grant Notification access so incoming bank SMS can be detected automatically.');
+      setIsListeningForSms(true);
+      setSmsPermissionState('granted');
+      return;
+    }
+
     setIsListeningForSms(true);
     setSmsPermissionState('granted');
-    setPermissionNotice('SMS detection active. Waiting for incoming bank SMS...');
+    setPermissionNotice(
+      notificationAccessEnabled
+        ? 'Notification access is on. Waiting for incoming bank SMS...'
+        : 'Turn on Money Flow in Notification access, then return here.'
+    );
 
     // If WebOTP API is supported, listen for native incoming SMS
     if ('OTPCredential' in window && navigator.credentials) {
@@ -186,7 +205,7 @@ export const SmsParserScreen: React.FC = () => {
             </h3>
           </div>
 
-          {isListeningForSms ? (
+            {isListeningForSms || notificationAccessEnabled ? (
             <span className="flex items-center gap-1.5 text-[11px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-2.5 py-1 rounded-full">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
               LISTENING
@@ -199,7 +218,8 @@ export const SmsParserScreen: React.FC = () => {
         </div>
 
         <p className="text-[12px] text-[#A0A0A0] leading-relaxed">
-          When activated, Money Flow listens for incoming SMS from your bank (Kotak, SBI, HDFC, ICICI, etc.) and automatically parses the debit amount, merchant, and reference code.
+          Grant Notification access, then turn on Money Flow in Android settings. Incoming bank SMS and UPI alerts are read on-device and auto-filled.
+          {notificationAccessEnabled ? ' Access is currently granted.' : ' Access is currently off.'}
         </p>
 
         {/* Action Controls */}
@@ -211,7 +231,7 @@ export const SmsParserScreen: React.FC = () => {
               className="px-4 py-2.5 rounded-full bg-[#D4AF37] hover:bg-[#E5C158] text-[#0F0F0F] font-bold text-[13px] shadow-md flex items-center gap-1.5 transition-all active:scale-95"
             >
               <span className="material-symbols-outlined text-[18px]">sensors</span>
-              <span>Grant SMS Permission &amp; Listen</span>
+              <span>Grant notification access</span>
             </button>
           ) : (
             <button

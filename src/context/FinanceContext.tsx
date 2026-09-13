@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState, useMemo } from 'react';
 import {
   Account,
   AutomationRule,
@@ -8,6 +8,7 @@ import {
   SavingsGoal,
   ScreenTab,
   SecuritySettings,
+  SmsPermissionLevel,
   StatementImportSummary,
   Subscription,
   Transaction,
@@ -29,6 +30,9 @@ import { ImportService } from '../services/importService';
 import { TransactionService } from '../services/transactionService';
 import { KOTAK_SAMPLE_STATEMENT_TEXT } from '../services/kotakStatementParser';
 import { BiometricService, BiometricCapability, AuthResult } from '../services/biometricService';
+import { SmsParserService } from '../services/smsParserService';
+import { App } from '@capacitor/app';
+import { isNativeAndroid, NotificationAccess } from '../plugins/notificationAccess';
 
 interface FinanceContextType {
   tab: ScreenTab;
@@ -79,6 +83,15 @@ interface FinanceContextType {
   depositToGoal: (goalId: string, amount: number, fromAccountId: string) => void;
   withdrawFromGoal: (goalId: string, amount: number, toAccountId: string) => void;
   addTransactionFromSms: (result: ParsedSmsResult) => void;
+  showSmsPermissionModal: boolean;
+  setShowSmsPermissionModal: (open: boolean) => void;
+  smsPermissionLevel: SmsPermissionLevel;
+  setSmsPermissionLevel: (level: SmsPermissionLevel) => void;
+  notificationAccessEnabled: boolean;
+  requestPhoneSmsPermission: () => Promise<boolean>;
+  detectedIncomingSms: ParsedSmsResult | null;
+  confirmDetectedSms: () => void;
+  dismissDetectedSms: () => void;
   exportToCsv: () => string;
   exportToJson: () => string;
   importFromJson: (jsonStr: string) => { success: boolean; message: string };
@@ -187,6 +200,24 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
   const [isAppSettingsModalOpen, setIsAppSettingsModalOpen] = useState(false);
+  const [showSmsPermissionModal, setShowSmsPermissionModal] = useState(false);
+  const [smsPermissionLevel, setSmsPermissionLevel] = useState<SmsPermissionLevel>(() => {
+    try {
+      const saved = localStorage.getItem('moneyflow_sms_permission_level');
+      if (
+        saved === 'always_allow' ||
+        saved === 'while_using' ||
+        saved === 'only_this_time' ||
+        saved === 'denied' ||
+        saved === 'unset'
+      ) {
+        return saved;
+      }
+    } catch {}
+    return 'unset';
+  });
+  const [notificationAccessEnabled, setNotificationAccessEnabled] = useState(false);
+  const [detectedIncomingSms, setDetectedIncomingSms] = useState<ParsedSmsResult | null>(null);
 
   const setTab = (newTab: ScreenTab) => {
     setTabState((currentTab) => {
@@ -238,6 +269,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setIsAppSettingsModalOpen(false);
       return true;
     }
+    if (showSmsPermissionModal) {
+      setShowSmsPermissionModal(false);
+      return true;
+    }
 
     // 2. Navigate back through tab history
     if (tabHistory.length > 1) {
@@ -267,6 +302,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     isProfileModalOpen ||
     isSecurityModalOpen ||
     isAppSettingsModalOpen ||
+    showSmsPermissionModal ||
     tabHistory.length > 1 ||
     tab !== 'dashboard'
   );
@@ -433,6 +469,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return INITIAL_CATEGORIES;
     }
   });
+  const accountsRef = useRef(accounts);
+  const categoriesRef = useRef(categories);
+  const lastSmsFingerprintRef = useRef<string>('');
+  accountsRef.current = accounts;
+  categoriesRef.current = categories;
 
   const [budgets, setBudgets] = useState<Budget[]>(() => {
     try {
@@ -1105,6 +1146,132 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   };
 
+  const NOTIFICATION_PROMPT_KEY = 'moneyflow_notification_access_prompted';
+  const SMS_PERMISSION_LEVEL_KEY = 'moneyflow_sms_permission_level';
+
+  const refreshNotificationAccess = async (): Promise<boolean> => {
+    if (!isNativeAndroid()) {
+      setNotificationAccessEnabled(false);
+      return false;
+    }
+    try {
+      const status = await NotificationAccess.isEnabled();
+      setNotificationAccessEnabled(status.enabled);
+      if (status.enabled) {
+        setSmsPermissionLevel((current) => (current === 'denied' || current === 'unset' ? 'always_allow' : current));
+      }
+      return status.enabled;
+    } catch {
+      setNotificationAccessEnabled(false);
+      return false;
+    }
+  };
+
+  const requestPhoneSmsPermission = async (): Promise<boolean> => {
+    if (!isNativeAndroid()) {
+      setShowSmsPermissionModal(true);
+      return false;
+    }
+    try {
+      await NotificationAccess.openSettings();
+      try {
+        localStorage.setItem(NOTIFICATION_PROMPT_KEY, '1');
+      } catch {}
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const confirmDetectedSms = () => {
+    if (!detectedIncomingSms) return;
+    addTransactionFromSms(detectedIncomingSms);
+    setDetectedIncomingSms(null);
+  };
+
+  const dismissDetectedSms = () => {
+    setDetectedIncomingSms(null);
+  };
+
+  useEffect(() => {
+    try {
+      const savedLevel = localStorage.getItem(SMS_PERMISSION_LEVEL_KEY);
+      if (
+        savedLevel === 'always_allow' ||
+        savedLevel === 'while_using' ||
+        savedLevel === 'only_this_time' ||
+        savedLevel === 'denied' ||
+        savedLevel === 'unset'
+      ) {
+        setSmsPermissionLevel(savedLevel);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SMS_PERMISSION_LEVEL_KEY, smsPermissionLevel);
+    } catch {}
+  }, [smsPermissionLevel]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const handlePosted = (event: { title?: string; text?: string }) => {
+      const raw = [event.title, event.text].filter(Boolean).join('\n').trim();
+      if (!raw) return;
+      const fingerprint = raw.replace(/\s+/g, ' ').slice(0, 240);
+      if (fingerprint === lastSmsFingerprintRef.current) return;
+      lastSmsFingerprintRef.current = fingerprint;
+      const parsed = SmsParserService.parseSms(raw, accountsRef.current, categoriesRef.current);
+      if (parsed) {
+        setDetectedIncomingSms(parsed);
+      }
+    };
+
+    const setup = async () => {
+      const enabled = await refreshNotificationAccess();
+      if (cancelled) return;
+
+      if (isNativeAndroid()) {
+        try {
+          const prompted = localStorage.getItem(NOTIFICATION_PROMPT_KEY);
+          const denied = smsPermissionLevel === 'denied';
+          if (!enabled && !prompted && !denied) {
+            setShowSmsPermissionModal(true);
+          }
+        } catch {
+          if (!enabled) setShowSmsPermissionModal(true);
+        }
+      }
+
+      const notificationHandle = await NotificationAccess.addListener('notificationPosted', handlePosted);
+      const resumeHandle = await App.addListener('resume', async () => {
+        const nowEnabled = await refreshNotificationAccess();
+        if (nowEnabled) {
+          setShowSmsPermissionModal(false);
+        }
+      });
+
+      return () => {
+        notificationHandle.remove();
+        resumeHandle.remove();
+      };
+    };
+
+    let teardown: (() => void) | undefined;
+    setup().then((fn) => {
+      teardown = fn;
+    });
+
+    return () => {
+      cancelled = true;
+      teardown?.();
+    };
+    // Prompt-once on mount; permission level is read from localStorage on first paint.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Export & Backup
   const exportToCsv = (): string => {
     const headers = ['ID', 'Date', 'Time', 'Type', 'Amount (INR)', 'Category', 'Account', 'Merchant / Party', 'UPI Ref', 'Notes'];
@@ -1362,6 +1529,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         depositToGoal,
         withdrawFromGoal,
         addTransactionFromSms,
+        showSmsPermissionModal,
+        setShowSmsPermissionModal,
+        smsPermissionLevel,
+        setSmsPermissionLevel,
+        notificationAccessEnabled,
+        requestPhoneSmsPermission,
+        detectedIncomingSms,
+        confirmDetectedSms,
+        dismissDetectedSms,
         exportToCsv,
         exportToJson,
         importFromJson,

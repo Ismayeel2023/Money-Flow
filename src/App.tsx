@@ -33,6 +33,8 @@ import { SubscriptionsScreen } from './components/SubscriptionsScreen';
 import { SavingsGoalsScreen } from './components/SavingsGoalsScreen';
 import { ExportBackupScreen } from './components/ExportBackupScreen';
 import { EdgeSwipeBack } from './components/EdgeSwipeBack';
+import { AndroidSmsPermissionModal } from './components/AndroidSmsPermissionModal';
+import { DetectedSmsBanner } from './components/DetectedSmsBanner';
 
 const MainContent: React.FC = () => {
   const {
@@ -222,6 +224,8 @@ const MainContent: React.FC = () => {
       <SecurityModal />
       <AppSettingsModal />
       <LockScreen />
+      <AndroidSmsPermissionModal />
+      <DetectedSmsBanner />
     </div>
   );
 };
