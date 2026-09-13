@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="#0F0F0F">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Money Flow"
+        android:textColor="#D4AF37"
+        android:textSize="26sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="Play Protect blocks the full app when you install the APK from Chrome or Files, because Money Flow needs Notification access to auto-detect bank SMS."
+        android:textColor="#E0E0E0"
+        android:textSize="15sp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="Install this helper first (it has no SMS or notification permissions). Then tap the button below to install Money Flow from this helper instead of from Files."
+        android:textColor="#A0A0A5"
+        android:textSize="14sp" />
+
+    <Button
+        android:id="@+id/install_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="28dp"
+        android:backgroundTint="#D4AF37"
+        android:text="Install Money Flow"
+        android:textColor="#0F0F0F"
+        android:textAllCaps="false" />
+
+    <TextView
+        android:id="@+id/status_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:textColor="#D4AF37"
+        android:textSize="14sp" />
+</LinearLayout>
