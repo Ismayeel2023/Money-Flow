@@ -48,6 +48,15 @@ public class NotificationAccessPlugin extends Plugin {
         call.resolve();
     }
 
+    @PluginMethod
+    public void openAppInfo(PluginCall call) {
+        Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+        intent.setData(android.net.Uri.parse("package:" + getContext().getPackageName()));
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        getContext().startActivity(intent);
+        call.resolve();
+    }
+
     public static void emitPosted(String packageName, String title, String text) {
         JSObject data = new JSObject();
         data.put("packageName", packageName == null ? "" : packageName);

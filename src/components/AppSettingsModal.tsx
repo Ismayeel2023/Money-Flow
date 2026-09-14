@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useFinance } from '../context/FinanceContext';
+import { AutoBackupService } from '../services/autoBackupService';
 
 export const AppSettingsModal: React.FC = () => {
   const {
@@ -7,10 +8,16 @@ export const AppSettingsModal: React.FC = () => {
     setIsAppSettingsModalOpen,
     resetToDemoData,
     currencySymbol,
+    monthCycleStartDay,
+    setMonthCycleStartDay,
+    budgetCycleLabel,
+    dailyExpenseRemindersEnabled,
+    setDailyExpenseRemindersEnabled,
+    exportToJson,
+    setTab,
   } = useFinance();
 
   const [selectedCurrency, setSelectedCurrency] = useState(currencySymbol || '₹');
-  const [startOfMonth, setStartOfMonth] = useState('1');
   const [confettiEnabled, setConfettiEnabled] = useState(true);
   const [hapticFeedback, setHapticFeedback] = useState(true);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -23,26 +30,15 @@ export const AppSettingsModal: React.FC = () => {
     setTimeout(() => setNotification(''), 2500);
   };
 
-  const handleExportBackup = () => {
+  const handleExportBackup = async () => {
     try {
-      const backupData = {
-        app: 'MoneyFlow Expense Tracker',
-        exportedAt: new Date().toISOString(),
-        version: '1.2.0',
-        accounts: JSON.parse(localStorage.getItem('moneyflow_accounts') || '[]'),
-        transactions: JSON.parse(localStorage.getItem('moneyflow_transactions') || '[]'),
-        budgets: JSON.parse(localStorage.getItem('moneyflow_budgets') || '[]'),
-        categories: JSON.parse(localStorage.getItem('moneyflow_categories') || '[]'),
-      };
-      const blob = new Blob([JSON.stringify(backupData, null, 2)], {
-        type: 'application/json',
-      });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `moneyflow_backup_${Date.now()}.json`;
-      a.click();
-      showNotification('Backup exported successfully');
+      const jsonContent = exportToJson();
+      const dateStr = new Date().toISOString().split('T')[0];
+      const result = await AutoBackupService.shareOrDownloadBackup(
+        jsonContent,
+        `MoneyFlow_FullBackup_${dateStr}.json`
+      );
+      showNotification(result.message);
     } catch {
       showNotification('Export failed');
     }
@@ -61,6 +57,8 @@ export const AppSettingsModal: React.FC = () => {
     { code: 'GBP', symbol: '£', name: 'British Pound' },
     { code: 'AED', symbol: 'AED', name: 'UAE Dirham' },
   ];
+
+  const presets = [1, 5, 10, 15, 20, 25];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fadeIn">
@@ -132,44 +130,96 @@ export const AppSettingsModal: React.FC = () => {
           </div>
         </div>
 
-        {/* 2. Budget Month Start Date */}
-        <div className="bg-[#222222] rounded-2xl p-4 border border-[#2A2A2A] flex flex-col gap-2">
-          <div className="flex items-center gap-2.5">
-            <span className="material-symbols-outlined text-[#34D399] text-[20px]">
-              calendar_month
-            </span>
-            <div>
-              <p className="font-bold text-[#FFFFFF] text-[14px]">Monthly Cycle Start</p>
-              <p className="text-[11px] text-[#888888]">Align with salary or payment day</p>
+        {/* 2. Budget Month Start Date (Supports Any Day 1-31) */}
+        <div className="bg-[#222222] rounded-2xl p-4 border border-[#2A2A2A] flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <span className="material-symbols-outlined text-[#34D399] text-[20px]">
+                calendar_month
+              </span>
+              <div>
+                <p className="font-bold text-[#FFFFFF] text-[14px]">Monthly Cycle Start</p>
+                <p className="text-[11px] text-[#888888]">Align with salary or payment day</p>
+              </div>
             </div>
+            <span className="text-[14px] font-bold text-[#34D399] bg-[#34D399]/15 px-2.5 py-0.5 rounded-full border border-[#34D399]/30">
+              Day {monthCycleStartDay}
+            </span>
           </div>
 
-          <div className="grid grid-cols-4 gap-1.5 pt-1">
-            {[
-              { val: '1', label: '1st' },
-              { val: '5', label: '5th' },
-              { val: '15', label: '15th' },
-              { val: '25', label: '25th' },
-            ].map((d) => (
+          {/* Preset Buttons */}
+          <div className="grid grid-cols-6 gap-1 pt-0.5">
+            {presets.map((day) => (
               <button
-                key={d.val}
+                key={day}
                 onClick={() => {
-                  setStartOfMonth(d.val);
-                  showNotification(`Budget cycle starts on the ${d.label}`);
+                  setMonthCycleStartDay(day);
+                  showNotification(`Monthly cycle set to start on day ${day}`);
                 }}
-                className={`py-1.5 text-[11px] font-bold rounded-xl border transition-all ${
-                  startOfMonth === d.val
+                className={`py-1 text-[11px] font-bold rounded-lg border transition-all ${
+                  monthCycleStartDay === day
                     ? 'bg-[#34D399] text-[#0F0F0F] border-[#34D399]'
                     : 'bg-[#181818] text-[#888888] border-[#2C2C2C] hover:text-[#FFFFFF]'
                 }`}
               >
-                {d.label}
+                {day}
               </button>
             ))}
           </div>
+
+          {/* Slider for Any Day 1–31 */}
+          <div className="flex flex-col gap-1 pt-1">
+            <div className="flex items-center justify-between text-[11px] text-[#888888]">
+              <span>Day 1</span>
+              <span>Day 15</span>
+              <span>Day 31</span>
+            </div>
+            <input
+              type="range"
+              min="1"
+              max="31"
+              value={monthCycleStartDay}
+              onChange={(e) => setMonthCycleStartDay(parseInt(e.target.value, 10))}
+              className="w-full accent-[#34D399] cursor-pointer"
+            />
+          </div>
+
+          {/* Active Cycle Date Range Display */}
+          <div className="p-2 bg-[#161616] border border-[#2C2C2C] rounded-xl text-center text-[12px] text-[#A0A0A0]">
+            Current Cycle: <strong className="text-[#FFFFFF]">{budgetCycleLabel}</strong>
+          </div>
         </div>
 
-        {/* 3. Confetti Animation */}
+        {/* 3. Daily Expense Reminders */}
+        <div className="bg-[#222222] rounded-2xl p-4 border border-[#2A2A2A] flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="material-symbols-outlined text-[#38BDF8] text-[20px]">
+              alarm
+            </span>
+            <div>
+              <p className="font-bold text-[#FFFFFF] text-[14px]">Daily Reminders</p>
+              <p className="text-[11px] text-[#888888]">Morning (9 AM) &amp; Evening (8 PM) pings</p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              const next = !dailyExpenseRemindersEnabled;
+              setDailyExpenseRemindersEnabled(next);
+              showNotification(next ? 'Daily reminders enabled' : 'Daily reminders disabled');
+            }}
+            className={`w-12 h-6 rounded-full p-1 transition-colors ${
+              dailyExpenseRemindersEnabled ? 'bg-[#38BDF8]' : 'bg-[#383838]'
+            }`}
+          >
+            <div
+              className={`w-4 h-4 rounded-full bg-[#0F0F0F] transition-transform ${
+                dailyExpenseRemindersEnabled ? 'translate-x-6' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* 4. Confetti Animation */}
         <div className="bg-[#222222] rounded-2xl p-4 border border-[#2A2A2A] flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="material-symbols-outlined text-[#F43F5E] text-[20px]">
@@ -198,7 +248,7 @@ export const AppSettingsModal: React.FC = () => {
           </button>
         </div>
 
-        {/* 4. Haptic Feedback */}
+        {/* 5. Haptic Feedback */}
         <div className="bg-[#222222] rounded-2xl p-4 border border-[#2A2A2A] flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="material-symbols-outlined text-[#A78BFA] text-[20px]">
@@ -227,7 +277,7 @@ export const AppSettingsModal: React.FC = () => {
           </button>
         </div>
 
-        {/* 5. Backup & Data Actions */}
+        {/* 6. Backup & Data Actions */}
         <div className="flex flex-col gap-2 pt-1">
           <button
             type="button"
@@ -236,6 +286,18 @@ export const AppSettingsModal: React.FC = () => {
           >
             <span className="material-symbols-outlined text-[18px]">download</span>
             Export JSON Backup
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setIsAppSettingsModalOpen(false);
+              setTab('export-backup');
+            }}
+            className="w-full bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30 font-body font-bold text-[13px] py-2.5 rounded-2xl transition-colors flex items-center justify-center gap-2"
+          >
+            <span className="material-symbols-outlined text-[18px]">cloud_sync</span>
+            Open Export &amp; Backup Screen
           </button>
 
           {!confirmReset ? (

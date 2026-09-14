@@ -83,9 +83,17 @@ export const AndroidSmsPermissionModal: React.FC = () => {
             <span className="material-symbols-outlined text-[16px] text-[#34D399]">tune</span>
             <span>On the next screen, find Money Flow and switch it on</span>
           </div>
-          <div className="flex items-center gap-2 text-[#E2E2E6]">
-            <span className="material-symbols-outlined text-[16px] text-[#34D399]">lock</span>
-            <span>100% on-device. Alerts never leave your phone</span>
+          <div className="flex items-start gap-2 text-[#E2E2E6]">
+            <span className="material-symbols-outlined text-[16px] text-amber-400 shrink-0 mt-0.5">info</span>
+            <span>
+              <strong>If toggle is greyed out (Restricted setting):</strong> Open App Info &gt; tap 3 dots (⋮) top-right &gt; tap <strong>&quot;Allow restricted settings&quot;</strong>, then enable toggle.
+            </span>
+          </div>
+          <div className="flex items-start gap-2 text-[#A0A0A5] pt-0.5">
+            <span className="material-symbols-outlined text-[16px] text-[#34D399] shrink-0 mt-0.5">lock</span>
+            <span>
+              Android warns that this permission can read all notifications. That is standard OS copy — Money Flow filters only bank alerts 100% on-device.
+            </span>
           </div>
         </div>
 

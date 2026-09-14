@@ -9,6 +9,7 @@ export interface NotificationPostedEvent {
 export interface NotificationAccessPlugin {
   isEnabled(): Promise<{ enabled: boolean }>;
   openSettings(): Promise<void>;
+  openAppInfo(): Promise<void>;
   addListener(
     eventName: 'notificationPosted',
     listenerFunc: (event: NotificationPostedEvent) => void
@@ -19,6 +20,7 @@ const NotificationAccess = registerPlugin<NotificationAccessPlugin>('Notificatio
   web: () => ({
     isEnabled: async () => ({ enabled: false }),
     openSettings: async () => {},
+    openAppInfo: async () => {},
     addListener: async () => ({
       remove: async () => {},
     }),

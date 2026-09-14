@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { useFinance } from '../context/FinanceContext';
+import { AutoBackupService } from '../services/autoBackupService';
 
 interface ParsedBackupData {
   appName?: string;
@@ -51,32 +52,25 @@ export const ExportBackupScreen: React.FC = () => {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const handleDownloadCsv = () => {
+  const handleDownloadCsv = async () => {
     const csvContent = exportToCsv();
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
     const dateStr = new Date().toISOString().split('T')[0];
-    link.setAttribute('download', `MoneyFlow_Transactions_${dateStr}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast('Transactions exported as CSV!');
+    const result = await AutoBackupService.shareOrDownloadBackup(
+      csvContent,
+      `MoneyFlow_Transactions_${dateStr}.csv`,
+      'text/csv;charset=utf-8;'
+    );
+    showToast(result.message);
   };
 
-  const handleDownloadJson = () => {
+  const handleDownloadJson = async () => {
     const jsonContent = exportToJson();
-    const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
     const dateStr = new Date().toISOString().split('T')[0];
-    link.setAttribute('download', `MoneyFlow_FullBackup_${dateStr}.json`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast('Full backup exported as JSON!');
+    const result = await AutoBackupService.shareOrDownloadBackup(
+      jsonContent,
+      `MoneyFlow_FullBackup_${dateStr}.json`
+    );
+    showToast(result.message);
   };
 
   // Test and verify backup integrity

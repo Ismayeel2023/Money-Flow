@@ -13,6 +13,7 @@ export const BudgetsScreen: React.FC = () => {
     updateBudget,
     setActiveTransactionForDetail,
     setTab,
+    budgetCycleLabel,
   } = useFinance();
 
   // Current year-month key (e.g. "2026-09")
@@ -162,7 +163,7 @@ export const BudgetsScreen: React.FC = () => {
                   : 'text-[#D4AF37]'
               }`}
             >
-              {isCurrentMonth ? 'Active Month' : isPastMonth ? 'Historical' : 'Future'} • {daysInfo}
+              {isCurrentMonth ? `Active Cycle (${budgetCycleLabel})` : isPastMonth ? 'Historical' : 'Future'} • {daysInfo}
             </span>
           </div>
 

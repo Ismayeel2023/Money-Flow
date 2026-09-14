@@ -167,6 +167,7 @@ export type ScreenTab =
   | 'dashboard'
   | 'activity'
   | 'add-transaction'
+  | 'bills'
   | 'budgets'
   | 'categories'
   | 'rules'
@@ -183,4 +184,92 @@ export type ScreenTab =
   | 'export-backup';
 
 export type SmsPermissionLevel = 'always_allow' | 'while_using' | 'only_this_time' | 'denied' | 'unset';
+
+export type BillType =
+  | 'utility'
+  | 'credit_card'
+  | 'loan_emi'
+  | 'rent'
+  | 'broadband'
+  | 'mobile'
+  | 'insurance'
+  | 'subscription'
+  | 'other';
+
+export type BillRecurrence = 'monthly' | 'bi_monthly' | 'quarterly' | 'yearly' | 'one_time';
+
+export type BillReminderDays = 0 | 1 | 2 | 3 | 7;
+
+export interface BillDueItem {
+  id: string;
+  title: string;
+  billerName: string;
+  type: BillType;
+  amount: number;
+  dueDay: number;
+  nextDueDate: string;
+  recurrence: BillRecurrence;
+  accountId?: string;
+  accountName?: string;
+  categoryId?: string;
+  categoryName?: string;
+  icon: string;
+  color: string;
+  reminderEnabled: boolean;
+  reminderDaysBefore: BillReminderDays;
+  isPaid: boolean;
+  lastPaidDate?: string;
+  consumerNumber?: string;
+  notes?: string;
+  autoDebit?: boolean;
+}
+
+export type AutoBackupCadence = 'daily' | 'weekly' | 'manual';
+
+export interface AutoBackupConfig {
+  enabled: boolean;
+  cadence: AutoBackupCadence;
+  maxSnapshots: number;
+  notifyIfOverdue: boolean;
+  compactExport: boolean;
+  lastAutoBackupDate?: string;
+}
+
+export interface BackupSnapshot {
+  id: string;
+  timestamp: string;
+  trigger: 'daily' | 'weekly' | 'manual' | 'pre_restore' | 'on_change';
+  label: string;
+  txCount: number;
+  accCount: number;
+  sizeBytes: number;
+  checksum: string;
+  data: string;
+}
+
+export interface SplitParticipant {
+  id: string;
+  name: string;
+  phone?: string;
+  upiId?: string;
+  amount: number;
+  paid: boolean;
+  settledDate?: string;
+  settledAccountId?: string;
+}
+
+export interface BillSplit {
+  id: string;
+  transactionId?: string;
+  title: string;
+  totalAmount: number;
+  userShare: number;
+  date: string;
+  categoryName?: string;
+  categoryIcon?: string;
+  notes?: string;
+  isFullySettled: boolean;
+  participants: SplitParticipant[];
+}
+
 

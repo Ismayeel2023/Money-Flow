@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useRef, useState, useMemo 
 import {
   Account,
   AutomationRule,
+  BillDueItem,
   Budget,
   Category,
   ParsedSmsResult,
@@ -31,8 +32,16 @@ import { TransactionService } from '../services/transactionService';
 import { KOTAK_SAMPLE_STATEMENT_TEXT } from '../services/kotakStatementParser';
 import { BiometricService, BiometricCapability, AuthResult } from '../services/biometricService';
 import { SmsParserService } from '../services/smsParserService';
+import { BillDueService } from '../services/billDueService';
+import {
+  formatCycleRangeLabel,
+  getBudgetCycleRange,
+  isCycleStartDay,
+  isDateInRange,
+} from '../services/cycleRange';
 import { App } from '@capacitor/app';
 import { isNativeAndroid, NotificationAccess } from '../plugins/notificationAccess';
+import { LocalReminders } from '../plugins/localReminders';
 
 interface FinanceContextType {
   tab: ScreenTab;
@@ -83,6 +92,22 @@ interface FinanceContextType {
   depositToGoal: (goalId: string, amount: number, fromAccountId: string) => void;
   withdrawFromGoal: (goalId: string, amount: number, toAccountId: string) => void;
   addTransactionFromSms: (result: ParsedSmsResult) => void;
+  bills: BillDueItem[];
+  addBill: (bill: Omit<BillDueItem, 'id' | 'isPaid'>) => void;
+  updateBill: (id: string, updates: Partial<BillDueItem>) => void;
+  deleteBill: (id: string) => void;
+  markBillPaid: (id: string, paymentAccountId?: string) => { success: boolean; message: string };
+  markBillUnpaid: (id: string) => void;
+  toggleBillReminder: (id: string) => void;
+  monthCycleStartDay: number;
+  setMonthCycleStartDay: (day: number) => void;
+  budgetCycleRange: { startDate: string; endDate: string; startDay: number };
+  budgetCycleLabel: string;
+  dailyExpenseRemindersEnabled: boolean;
+  setDailyExpenseRemindersEnabled: (enabled: boolean) => void;
+  requestLocalReminderPermission: () => Promise<boolean>;
+  notificationAccessHint: string | null;
+  openNotificationAppInfo: () => Promise<void>;
   showSmsPermissionModal: boolean;
   setShowSmsPermissionModal: (open: boolean) => void;
   smsPermissionLevel: SmsPermissionLevel;
@@ -146,6 +171,11 @@ const STORAGE_KEYS = {
   BUDGETS: 'moneyflow_app_buds_v3',
   CATEGORIES: 'moneyflow_app_cats_v3',
   IMPORT_BATCH: 'moneyflow_app_batch_v3',
+  BILLS: 'moneyflow_bills_v1',
+  CYCLE_START: 'moneyflow_month_cycle_start_day',
+  DAILY_REMINDERS: 'moneyflow_daily_expense_reminders',
+  LAST_MONTHLY_NOTIF: 'moneyflow_last_monthly_notif',
+  LAST_BILL_NOTIF: 'moneyflow_last_bill_notif_date',
 };
 
 const sanitizeLoadedTransactions = (): Transaction[] => {
@@ -217,7 +247,24 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return 'unset';
   });
   const [notificationAccessEnabled, setNotificationAccessEnabled] = useState(false);
+  const [notificationAccessHint, setNotificationAccessHint] = useState<string | null>(null);
   const [detectedIncomingSms, setDetectedIncomingSms] = useState<ParsedSmsResult | null>(null);
+  const [monthCycleStartDay, setMonthCycleStartDayState] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.CYCLE_START);
+      const parsed = saved ? parseInt(saved, 10) : 1;
+      if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 31) return parsed;
+    } catch {}
+    return 1;
+  });
+  const [dailyExpenseRemindersEnabled, setDailyExpenseRemindersEnabledState] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.DAILY_REMINDERS);
+      if (saved === '0') return false;
+      if (saved === '1') return true;
+    } catch {}
+    return true;
+  });
 
   const setTab = (newTab: ScreenTab) => {
     setTabState((currentTab) => {
@@ -469,6 +516,17 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const [accounts, setAccounts] = useState<Account[]>(() => sanitizeLoadedAccounts(sanitizeLoadedTransactions()));
 
+  const [bills, setBills] = useState<BillDueItem[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.BILLS);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
+
   const [categories, setCategories] = useState<Category[]>(() => {
     try {
       return CategoryService.getCategories();
@@ -548,23 +606,70 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [budgets]);
 
   useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.BILLS, JSON.stringify(bills));
+    } catch {}
+  }, [bills]);
+
+  const budgetCycleRange = useMemo(
+    () => getBudgetCycleRange(monthCycleStartDay),
+    [monthCycleStartDay, transactions]
+  );
+  const budgetCycleLabel = useMemo(() => formatCycleRangeLabel(budgetCycleRange), [budgetCycleRange]);
+
+  const setMonthCycleStartDay = (day: number) => {
+    const clamped = Math.min(31, Math.max(1, Math.round(day) || 1));
+    setMonthCycleStartDayState(clamped);
+    try {
+      localStorage.setItem(STORAGE_KEYS.CYCLE_START, String(clamped));
+    } catch {}
+  };
+
+  const setDailyExpenseRemindersEnabled = (enabled: boolean) => {
+    setDailyExpenseRemindersEnabledState(enabled);
+    try {
+      localStorage.setItem(STORAGE_KEYS.DAILY_REMINDERS, enabled ? '1' : '0');
+    } catch {}
+    LocalReminders.scheduleExpenseReminders({ enabled }).catch(() => {});
+  };
+
+  useEffect(() => {
     CategoryService.saveCategories(categories);
   }, [categories]);
+
+  // Sync whether expenses are logged today for native daily reminder alarm filtering
+  useEffect(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const hasExpenseToday = transactions.some(
+      (t) => t.type === 'expense' && t.date === todayStr
+    );
+    LocalReminders.setHasExpenseToday({ logged: hasExpenseToday, date: todayStr }).catch(() => {});
+  }, [transactions]);
+
+  // Check if app was opened via notification tap
+  useEffect(() => {
+    LocalReminders.consumePendingOpenTab()
+      .then((res) => {
+        if (res.tab === 'add-transaction') {
+          setTab('add-transaction');
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.IMPORT_BATCH, JSON.stringify(importSummaryState.transactions));
   }, [importSummaryState]);
 
-  // Recalculate budget spent dynamically for the current month when transactions change
+  // Recalculate budget spent dynamically for the current budget cycle when transactions change
   useEffect(() => {
-    const currentMonthKey = new Date().toISOString().slice(0, 7);
+    const { startDate, endDate } = getBudgetCycleRange(monthCycleStartDay);
     setBudgets((prevBudgets) =>
       prevBudgets.map((b) => {
         const spent = transactions
           .filter((t) => {
             if (t.categoryId !== b.categoryId || t.type !== 'expense') return false;
-            const txMonth = t.date ? t.date.slice(0, 7) : currentMonthKey;
-            return txMonth === currentMonthKey;
+            return t.date ? isDateInRange(t.date, startDate, endDate) : false;
           })
           .reduce((sum, t) => sum + t.amount, 0);
 
@@ -582,7 +687,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         };
       })
     );
-  }, [transactions]);
+  }, [transactions, monthCycleStartDay]);
 
   // Currency Formatter
   const formatCurrency = (
@@ -617,11 +722,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const netWorth = bankAndCashBalance - creditOutstanding;
 
     const income = transactions
-      .filter((t) => t.type === 'income')
+      .filter((t) => t.type === 'income' && isDateInRange(t.date, budgetCycleRange.startDate, budgetCycleRange.endDate))
       .reduce((sum, t) => sum + t.amount, 0);
 
     const expense = transactions
-      .filter((t) => t.type === 'expense')
+      .filter((t) => t.type === 'expense' && isDateInRange(t.date, budgetCycleRange.startDate, budgetCycleRange.endDate))
       .reduce((sum, t) => sum + t.amount, 0);
 
     const flow = income - expense;
@@ -636,13 +741,13 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       netFlow: flow,
       totalNetWorth: netWorth,
     };
-  }, [accounts, transactions]);
+  }, [accounts, transactions, budgetCycleRange]);
 
   // Top spending calculation
   const topSpendings = useMemo(() => {
     const categoryTotals: Record<string, number> = {};
     transactions
-      .filter((t) => t.type === 'expense')
+      .filter((t) => t.type === 'expense' && isDateInRange(t.date, budgetCycleRange.startDate, budgetCycleRange.endDate))
       .forEach((t) => {
         categoryTotals[t.categoryId] = (categoryTotals[t.categoryId] || 0) + t.amount;
       });
@@ -666,7 +771,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         };
       })
       .sort((a, b) => b.amount - a.amount);
-  }, [transactions, categories]);
+  }, [transactions, categories, budgetCycleRange]);
 
   const totalBudgetAllocated = useMemo(() => {
     return budgets.reduce((sum, b) => sum + b.allocated, 0);
@@ -690,6 +795,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setAccounts((prevAccounts) =>
       TransactionService.updateAccountBalances([newTx], prevAccounts)
     );
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    if (newTx.type === 'expense' && newTx.date === todayStr) {
+      LocalReminders.setHasExpenseToday({ logged: true, date: todayStr }).catch(() => {});
+    }
 
     return newTx;
   };
@@ -1153,6 +1263,68 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   };
 
+  const addBill = (bill: Omit<BillDueItem, 'id' | 'isPaid'>) => {
+    const newBill: BillDueItem = {
+      ...bill,
+      id: `bill-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      isPaid: false,
+    };
+    setBills((prev) => [newBill, ...prev]);
+  };
+
+  const updateBill = (id: string, updates: Partial<BillDueItem>) => {
+    setBills((prev) => prev.map((b) => (b.id === id ? { ...b, ...updates } : b)));
+  };
+
+  const deleteBill = (id: string) => {
+    setBills((prev) => prev.filter((b) => b.id !== id));
+  };
+
+  const markBillPaid = (id: string, paymentAccountId?: string): { success: boolean; message: string } => {
+    const bill = bills.find((b) => b.id === id);
+    if (!bill) return { success: false, message: 'Bill not found.' };
+    const acc = accounts.find((a) => a.id === (paymentAccountId || bill.accountId)) || accounts[0];
+    const cat = categories.find((c) => c.id === bill.categoryId) || categories[0];
+    const dateStr = new Date().toISOString().split('T')[0];
+    const timeStr = new Date().toTimeString().slice(0, 5);
+    addTransaction({
+      amount: bill.amount,
+      type: 'expense',
+      categoryId: cat?.id || 'cat-bills',
+      categoryName: cat?.name || bill.categoryName || 'Bills & Utilities',
+      categoryIcon: cat?.icon || bill.icon,
+      categoryColor: cat?.color || bill.color,
+      accountId: acc?.id || '',
+      accountName: acc?.name || '',
+      merchant: bill.billerName,
+      party: bill.billerName,
+      partyType: 'merchant',
+      date: dateStr,
+      time: timeStr,
+      notes: `Bill payment: ${bill.title}`,
+    });
+    const nextDue =
+      bill.recurrence === 'one_time'
+        ? bill.nextDueDate
+        : BillDueService.calculateNextDueDate(bill.nextDueDate, bill.recurrence, bill.dueDay);
+    updateBill(id, {
+      isPaid: bill.recurrence === 'one_time',
+      lastPaidDate: dateStr,
+      nextDueDate: nextDue,
+    });
+    return { success: true, message: `Paid ${bill.title}` };
+  };
+
+  const markBillUnpaid = (id: string) => {
+    updateBill(id, { isPaid: false });
+  };
+
+  const toggleBillReminder = (id: string) => {
+    setBills((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, reminderEnabled: !b.reminderEnabled } : b))
+    );
+  };
+
   const NOTIFICATION_PROMPT_KEY = 'moneyflow_notification_access_prompted';
   const SMS_PERMISSION_LEVEL_KEY = 'moneyflow_sms_permission_level';
 
@@ -1166,6 +1338,11 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setNotificationAccessEnabled(status.enabled);
       if (status.enabled) {
         setSmsPermissionLevel((current) => (current === 'denied' || current === 'unset' ? 'always_allow' : current));
+        setNotificationAccessHint(null);
+      } else {
+        setNotificationAccessHint(
+          'If the toggle is greyed out or says not secure: Apps → Money Flow → ⋮ → Allow restricted settings, then enable Notification access. Android will warn this can read all notifications — that is normal. Money Flow only keeps bank/UPI debit-credit text on this phone.'
+        );
       }
       return status.enabled;
     } catch {
@@ -1185,6 +1362,25 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         localStorage.setItem(NOTIFICATION_PROMPT_KEY, '1');
       } catch {}
       return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const openNotificationAppInfo = async () => {
+    if (!isNativeAndroid()) return;
+    try {
+      await NotificationAccess.openAppInfo();
+    } catch {}
+  };
+
+  const requestLocalReminderPermission = async (): Promise<boolean> => {
+    try {
+      const result = await LocalReminders.requestPermission();
+      if (result.granted && dailyExpenseRemindersEnabled) {
+        await LocalReminders.scheduleExpenseReminders({ enabled: true });
+      }
+      return result.granted;
     } catch {
       return false;
     }
@@ -1549,6 +1745,22 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         depositToGoal,
         withdrawFromGoal,
         addTransactionFromSms,
+        bills,
+        addBill,
+        updateBill,
+        deleteBill,
+        markBillPaid,
+        markBillUnpaid,
+        toggleBillReminder,
+        monthCycleStartDay,
+        setMonthCycleStartDay,
+        budgetCycleRange,
+        budgetCycleLabel,
+        dailyExpenseRemindersEnabled,
+        setDailyExpenseRemindersEnabled,
+        requestLocalReminderPermission,
+        notificationAccessHint,
+        openNotificationAppInfo,
         showSmsPermissionModal,
         setShowSmsPermissionModal,
         smsPermissionLevel,

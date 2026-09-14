@@ -58,6 +58,7 @@ dependencies {
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
     implementation "androidx.biometric:biometric:1.1.0"
+    implementation "androidx.core:core:$androidxCoreVersion"
 }
 
 apply from: 'capacitor.build.gradle'
