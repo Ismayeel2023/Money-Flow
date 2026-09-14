@@ -140,15 +140,31 @@ export class StatementService {
         let rest = line.slice(dateMatch[0].length).trim();
         let valueDateStr: string | undefined;
 
-        // Check if second date (Value Date) immediately follows Txn Date
+        // Check if second date (Value Date) immediately follows Txn Date on the same line
         const valueDateMatch = rest.match(dateRegex);
         if (valueDateMatch) {
           valueDateStr = valueDateMatch[1];
           rest = rest.slice(valueDateMatch[0].length).trim();
+        } else {
+          // Lookahead: check if next non-empty, non-header line is also a date (Value Date column in PDF)
+          let nextIdx = i + 1;
+          while (nextIdx < textLines.length) {
+            const nextLine = textLines[nextIdx].trim();
+            if (!nextLine || isHeaderOrFooter(nextLine)) {
+              nextIdx++;
+              continue;
+            }
+            const nextDateMatch = nextLine.match(dateRegex);
+            if (nextDateMatch) {
+              valueDateStr = nextDateMatch[1];
+              i = nextIdx; // Skip the value date line
+            }
+            break;
+          }
         }
 
         currentBlock = {
-          lines: [rest],
+          lines: rest ? [rest] : [],
           dateStr,
           valueDateStr,
         };
