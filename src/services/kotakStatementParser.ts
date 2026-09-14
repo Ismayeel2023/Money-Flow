@@ -25,10 +25,9 @@ export class KotakStatementParser {
     const lower = text.toLowerCase();
     return (
       lower.includes('kotak mahindra bank') ||
-      lower.includes('kkbk') ||
-      lower.includes('crn xxxxxx') ||
+      (lower.includes('kotak') && lower.includes('account statement')) ||
       (lower.includes('savings account transactions') && lower.includes('withdrawal (dr.)')) ||
-      (lower.includes('kotak') && lower.includes('account statement'))
+      (lower.includes('crn ') && lower.includes('kotak'))
     );
   }
 

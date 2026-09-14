@@ -64,6 +64,21 @@ describe('SbiStatementParser & TransactionService', () => {
     );
     expect(jio.party).toBe('JIO');
     expect(jio.partyType).toBe('merchant');
+
+    // 8. Raw description with leading date and embedded amounts (from SBI PDF statement)
+    const sbiRaw1 = SbiStatementParser.extractPartyInfo(
+      '10/04/2026 UPI/DR/610046843309/MS - 110.00 - 4,145.87 RAJES/YESB/q756688306/Paid 0097694162092 AT 02227 KURUMBUR WDL TFR',
+      false
+    );
+    expect(sbiRaw1.party).toBe('MS RAJES');
+    expect(sbiRaw1.upiRef).toBe('610046843309');
+
+    const sbiRaw2 = SbiStatementParser.extractPartyInfo(
+      '11/04/2026 UPI/DR/110451822762/GRAND - 100.00 - 4,045.87 BA/SIBL/bhqr.29727/NO R 0097695162091 AT 02227 KURUMBUR Page no. 3 Balance WDL TFR',
+      false
+    );
+    expect(sbiRaw2.party).toBe('GRAND BA');
+    expect(sbiRaw2.upiRef).toBe('110451822762');
   });
 
   it('correctly handles duplicate detection via UPI and fingerprint', () => {

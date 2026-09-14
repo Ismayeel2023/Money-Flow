@@ -26,7 +26,10 @@ export class SbiStatementParser {
     upiRef?: string;
     isRefund: boolean;
   } {
-    const cleanDesc = description.replace(/\s+/g, ' ').trim();
+    let cleanDesc = description
+      .replace(/^(\d{1,2}[\/\-\s](?:[A-Za-z]{3}|\d{1,2})[\/\-\s]\d{2,4}|\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})\s*/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
     let upiRef: string | undefined;
     let isRefund = false;
 
@@ -78,13 +81,32 @@ export class SbiStatementParser {
         'NEFT',
         'RTGS',
         'IMPS',
+        'PAID',
+        'NO R',
+        'WDL',
+        'TFR',
       ]);
 
       for (let i = 0; i < parts.length; i++) {
-        const candidate = parts[i]?.trim();
-        if (!candidate || /^\d+$/.test(candidate) || ignoredKeywords.has(candidate.toUpperCase())) {
+        let candidate = parts[i]?.trim();
+        if (!candidate) continue;
+
+        // Clean out embedded balance/amount artifacts like "- 110.00 - 4,145.87" or "- -"
+        candidate = candidate
+          .replace(/-\s*[\d,]+\.\d{2}\s*/g, ' ')
+          .replace(/-\s*-/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        if (
+          !candidate ||
+          /^\d+$/.test(candidate) ||
+          ignoredKeywords.has(candidate.toUpperCase()) ||
+          /^\d{4}\s+UPI$/i.test(candidate)
+        ) {
           continue;
         }
+
         // Found a potential party segment
         party = candidate;
         break;
@@ -135,9 +157,12 @@ export class SbiStatementParser {
         .replace(/BY TRANSFER-INB/gi, '')
         .replace(/BY TRANSFER/gi, '')
         .replace(/TO TRANSFER/gi, '')
+        .replace(/-\s*[\d,]+\.\d{2}\s*/g, ' ')
+        .replace(/-\s*-/g, ' ')
+        .replace(/\s+/g, ' ')
         .trim();
       const firstPart = cleaned.split('/')[0]?.slice(0, 40)?.trim() || 'Merchant/Payee';
-      party = firstPart.replace(/^[\(\[\{]+/, '').replace(/[\)\]\}]+$/, '').trim();
+      party = firstPart.replace(/^[\(\[\{]+/, '').replace(/[\)\]\}]+$/, '').replace(/\s+-\s*$/, '').trim();
     }
 
     // Classify partyType if still unknown
